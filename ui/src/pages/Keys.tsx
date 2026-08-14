@@ -79,7 +79,7 @@ export function Keys() {
                   <th>{t('keys.col.label')}</th>
                   <th>{t('keys.col.status')}</th>
                   <th>{t('keys.col.used')}</th>
-                  <th>{t('keys.col.created')}</th>
+                  <th className="opt">{t('keys.col.created')}</th>
                   <th />
                 </tr>
               </thead>
@@ -112,7 +112,7 @@ export function Keys() {
                       <td className="tnum">
                         {k.used_count} / {k.max_uses ?? '∞'}
                       </td>
-                      <td className="u-sub tnum">{fmtWhen(k.created_at, lang, t('time.now'))}</td>
+                      <td className="u-sub tnum opt">{fmtWhen(k.created_at, lang, t('time.now'))}</td>
                       <td className="rowbtns">
                         <button className="btn bad sm" disabled={k.status !== 'active'} onClick={() => revoke(k.id)}>
                           {t('keys.revoke')}

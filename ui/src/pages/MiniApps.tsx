@@ -78,10 +78,10 @@ export function MiniApps() {
               <thead>
                 <tr>
                   <th>{t('miniApps.col.app')}</th>
-                  <th>{t('miniApps.col.needs')}</th>
+                  <th className="opt">{t('miniApps.col.needs')}</th>
                   <th>{t('miniApps.col.status')}</th>
                   <th>{t('miniApps.col.version')}</th>
-                  <th>{t('miniApps.col.downloads')}</th>
+                  <th className="opt">{t('miniApps.col.downloads')}</th>
                   <th />
                 </tr>
               </thead>
@@ -94,7 +94,7 @@ export function MiniApps() {
                         <div className="u-main">{s.name}</div>
                         <div className="u-sub">{s.short_description ?? s.slug}</div>
                       </td>
-                      <td>
+                      <td className="opt">
                         <div className="chips">
                           {s.capabilities.browser_platforms.map((p) => (
                             <Pill key={p} tone="accent">
@@ -111,7 +111,7 @@ export function MiniApps() {
                         <span className="keychip">v{s.latest_version ?? '—'}</span>
                         {s.has_mini_app && <span className="u-sub"> · {t('miniApps.hasZip')}</span>}
                       </td>
-                      <td className="tnum">
+                      <td className="tnum opt">
                         {s.stats.downloads ? fmtCount(s.stats.downloads, lang) : '—'}
                       </td>
                       <td className="u-sub">›</td>

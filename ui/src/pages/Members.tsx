@@ -89,7 +89,7 @@ export function Members() {
                 <tr>
                   <th>{t('members.col.user')}</th>
                   <th>{t('members.col.status')}</th>
-                  <th>{t('members.col.using')}</th>
+                  <th className="opt">{t('members.col.using')}</th>
                   <th>{t('members.col.online')}</th>
                   <th />
                 </tr>
@@ -111,7 +111,7 @@ export function Members() {
                           <Pill tone="ok">{t('status.member.active')}</Pill>
                         )}
                       </td>
-                      <td>
+                      <td className="opt">
                         <div className="chips">
                           {m.all_scripts && <Pill tone="accent">{t('members.allApps')}</Pill>}
                           {m.script_ids.map((id) => (

@@ -505,9 +505,9 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
               <tr>
                 <th>{t('versions.col.version')}</th>
                 <th>{t('versions.col.changelog')}</th>
-                <th>{t('versions.col.minApp')}</th>
+                <th className="opt">{t('versions.col.minApp')}</th>
                 <th>{t('versions.col.status')}</th>
-                <th>{t('versions.col.date')}</th>
+                <th className="opt">{t('versions.col.date')}</th>
               </tr>
             </thead>
             <tbody>
@@ -533,11 +533,11 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
                             </button>
                           </div>
                         </td>
-                        <td className="tnum u-sub">{v.min_app_version ?? '—'}</td>
+                        <td className="tnum u-sub opt">{v.min_app_version ?? '—'}</td>
                         <td>
                           <Pill tone={vs.tone}>{t(vs.key)}</Pill>
                         </td>
-                        <td className="u-sub tnum">{fmtWhen(v.created_at, lang, t('time.now'))}</td>
+                        <td className="u-sub tnum opt">{fmtWhen(v.created_at, lang, t('time.now'))}</td>
                       </tr>
                       {open.has(v.id) && (
                         <tr>
@@ -769,8 +769,8 @@ function DetailPackaging({
               <tr>
                 <th>{t('packaging.col.platform')}</th>
                 <th>{t('packaging.col.fromVersion')}</th>
-                <th>{t('packaging.col.builtBy')}</th>
-                <th>{t('packaging.col.size')}</th>
+                <th className="opt">{t('packaging.col.builtBy')}</th>
+                <th className="opt">{t('packaging.col.size')}</th>
                 <th>{t('packaging.col.status')}</th>
                 <th />
               </tr>
@@ -786,12 +786,12 @@ function DetailPackaging({
                     <td>
                       <span className="keychip">v{b.app_version}</span>
                     </td>
-                    <td>
+                    <td className="opt">
                       <Pill tone="neutral">
                         {t(b.built_by === 'server' ? 'packaging.builtBy.server' : 'packaging.builtBy.agent')}
                       </Pill>
                     </td>
-                    <td className="tnum u-sub">{fmtBytes(b.size_bytes)}</td>
+                    <td className="tnum u-sub opt">{fmtBytes(b.size_bytes)}</td>
                     <td>
                       <Pill tone={bs.tone}>{t(bs.key)}</Pill>
                     </td>

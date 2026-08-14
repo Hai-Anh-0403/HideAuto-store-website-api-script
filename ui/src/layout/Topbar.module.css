@@ -48,3 +48,34 @@
   transition: background var(--dur-fast) var(--ease-out);
 }
 .icobtn:hover { color: var(--text-primary); background: var(--surface-3); }
+
+.menubtn {
+  display: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  place-items: center;
+  font-size: 15px;
+  flex: none;
+}
+.menubtn:hover { color: var(--text-primary); background: var(--surface-3); }
+.logoutIcon { display: none; }
+
+/* Màn hẹp: hiện nút mở drawer, bỏ bớt chữ để hàng trên không tràn. */
+@media (max-width: 900px) {
+  .top { padding: 10px 16px; gap: 10px; }
+  .menubtn { display: grid; }
+  .title { font-size: 15px; }
+}
+
+@media (max-width: 640px) {
+  .crumb { display: none; }
+  .statusPill { display: none; }
+  .whoName { display: none; }
+  .who { padding: 4px; border: 0; background: transparent; }
+  .logout { display: none; }
+  .logoutIcon { display: grid; }
+}

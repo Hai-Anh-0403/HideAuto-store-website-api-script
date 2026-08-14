@@ -31,6 +31,7 @@ export const en: Record<keyof typeof vi, string> = {
   'topbar.logout': 'Sign out',
   'topbar.theme': 'Switch light / dark / system theme',
   'topbar.language': 'Switch language',
+  'topbar.menu': 'Open menu',
 
   'status.seller.pending': 'Pending',
   'status.seller.approved': 'Approved',

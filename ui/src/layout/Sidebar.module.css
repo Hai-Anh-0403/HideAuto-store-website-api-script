@@ -64,3 +64,22 @@
   color: var(--text-muted);
   font-size: 11px;
 }
+
+/* Drawer trượt trên màn hẹp — mặc định nằm ngoài màn hình, mở bằng nút ☰ ở topbar. */
+@media (max-width: 900px) {
+  .side {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 260px;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform var(--dur-base) var(--ease-out);
+    box-shadow: var(--shadow-3);
+  }
+  .open { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .side { transition: none; }
+}

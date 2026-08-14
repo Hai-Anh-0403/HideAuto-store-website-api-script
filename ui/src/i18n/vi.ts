@@ -29,6 +29,7 @@ export const vi = {
   'topbar.logout': 'Đăng xuất',
   'topbar.theme': 'Đổi giao diện sáng / tối / theo hệ thống',
   'topbar.language': 'Đổi ngôn ngữ',
+  'topbar.menu': 'Mở menu',
 
   'status.seller.pending': 'Chờ duyệt',
   'status.seller.approved': 'Đã duyệt',

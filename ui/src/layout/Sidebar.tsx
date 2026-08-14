@@ -9,10 +9,10 @@ const NAV: { to: string; key: MessageKey; icon: string; end: boolean }[] = [
   { to: '/members', key: 'nav.members', icon: '👥', end: false },
 ]
 
-export function Sidebar() {
+export function Sidebar({ open = false }: { open?: boolean }) {
   const { t } = useI18n()
   return (
-    <aside className={styles.side}>
+    <aside className={open ? `${styles.side} ${styles.open}` : styles.side}>
       <div className={styles.brand}>
         <div className={styles.logo}>S</div>
         <div>

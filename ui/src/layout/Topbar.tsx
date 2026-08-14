@@ -25,7 +25,13 @@ function initials(name: string): string {
 
 const THEME_ICON = { system: '◐', light: '☀', dark: '☾' } as const
 
-export function Topbar() {
+export function Topbar({
+  navOpen,
+  onToggleNav,
+}: {
+  navOpen: boolean
+  onToggleNav: () => void
+}) {
   const { pathname } = useLocation()
   const { mode, cycle } = useTheme()
   const { seller, logout } = useAuth()
@@ -35,6 +41,15 @@ export function Topbar() {
 
   return (
     <header className={styles.top}>
+      <button
+        className={styles.menubtn}
+        onClick={onToggleNav}
+        aria-label={t('topbar.menu')}
+        aria-expanded={navOpen}
+        title={t('topbar.menu')}
+      >
+        ☰
+      </button>
       <div>
         <div className={styles.crumb}>
           <b>{t('topbar.crumb')}</b> · storeAutoHide
@@ -42,10 +57,14 @@ export function Topbar() {
         <h1 className={styles.title}>{titleKey ? t(titleKey) : ''}</h1>
       </div>
       <div className="sp" />
-      {status && <Pill tone={status.tone}>{t(status.key)}</Pill>}
+      {status && (
+        <span className={styles.statusPill}>
+          <Pill tone={status.tone}>{t(status.key)}</Pill>
+        </span>
+      )}
       <div className={styles.who}>
         <span className={styles.av}>{initials(seller?.name ?? '?')}</span>
-        {seller?.name}
+        <span className={styles.whoName}>{seller?.name}</span>
       </div>
       <button
         className={styles.icobtn}
@@ -57,8 +76,16 @@ export function Topbar() {
       <button className={styles.icobtn} onClick={cycle} title={t('topbar.theme')}>
         {THEME_ICON[mode]}
       </button>
-      <button className="btn sm" onClick={logout}>
+      <button className={`btn sm ${styles.logout}`} onClick={logout}>
         {t('topbar.logout')}
+      </button>
+      <button
+        className={`${styles.icobtn} ${styles.logoutIcon}`}
+        onClick={logout}
+        aria-label={t('topbar.logout')}
+        title={t('topbar.logout')}
+      >
+        ⏻
       </button>
     </header>
   )

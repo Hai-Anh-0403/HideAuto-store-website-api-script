@@ -85,7 +85,7 @@ export function Overview() {
                   <th>{t('members.col.user')}</th>
                   <th>{t('members.col.status')}</th>
                   <th>{t('members.col.online')}</th>
-                  <th>{t('members.col.using')}</th>
+                  <th className="opt">{t('members.col.using')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -114,7 +114,7 @@ export function Overview() {
                           </Pill>
                         )}
                       </td>
-                      <td>
+                      <td className="opt">
                         <div className="chips">
                           {m.all_scripts && <Pill tone="accent">{t('members.allApps')}</Pill>}
                           {m.script_ids.map((id) => (
