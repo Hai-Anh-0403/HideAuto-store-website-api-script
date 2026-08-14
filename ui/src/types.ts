@@ -143,6 +143,13 @@ export interface KeyItem {
   created_at: string
 }
 
+/** Tuỳ chọn khi phát hành khóa — bỏ trống là không giới hạn / không hết hạn. */
+export interface KeyCreate {
+  label: string | null
+  max_uses: number | null
+  expires_at: string | null
+}
+
 export interface Member {
   id: string
   user_id: string
@@ -154,6 +161,22 @@ export interface Member {
   last_seen_at: string | null
   blocked_devices: string[]
   redeemed_at: string
+}
+
+export interface MemberDevice {
+  machine_id: string
+  name: string | null
+  os: string | null
+  last_seen_at: string | null
+  blocked: boolean
+}
+
+export interface MemberUsage {
+  user_id: string
+  online: boolean
+  last_seen_at: string | null
+  usage_synced_at: string | null
+  devices: MemberDevice[]
 }
 
 export interface MiniAppBuild {

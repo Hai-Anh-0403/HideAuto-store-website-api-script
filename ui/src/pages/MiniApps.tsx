@@ -2,8 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardHead } from '../ui/Card'
 import { CapsChips } from '../ui/CapsChips'
+import { GroupChips } from '../ui/GroupChips'
 import { Pill } from '../ui/Pill'
-import { ErrorState, Loading, PendingApproval } from '../ui/States'
+import { Empty, ErrorState, PendingApproval, TableSkeleton } from '../ui/States'
 import { useToast } from '../ui/Toast'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
@@ -62,7 +63,18 @@ export function MiniApps() {
           }
         />
         {scripts.loading ? (
-          <Loading what={t('nav.miniApps').toLowerCase()} />
+          <TableSkeleton />
+        ) : !items.length ? (
+          <Empty
+            icon="🧩"
+            title={t('miniApps.emptyTitle')}
+            body={t('miniApps.emptyBody')}
+            action={
+              <button className="btn pri sm" disabled={!approved} onClick={() => setShowUpload(true)}>
+                {t('miniApps.upload')}
+              </button>
+            }
+          />
         ) : (
           <div className="tscroll">
             <table>
@@ -77,46 +89,38 @@ export function MiniApps() {
                 </tr>
               </thead>
               <tbody>
-                {items.length ? (
-                  items.map((s) => {
-                    const st = scriptStatus[s.status]
-                    return (
-                      <tr key={s.id} className="rowlink" onClick={() => nav(`/mini-apps/${s.id}`)}>
-                        <td>
-                          <div className="u-main">{s.name}</div>
-                          <div className="u-sub">{s.short_description ?? s.slug}</div>
-                        </td>
-                        <td>
-                          <div className="chips">
-                            {s.capabilities.browser_platforms.map((p) => (
-                              <Pill key={p} tone="accent">
-                                {p}
-                              </Pill>
-                            ))}
-                            {s.capabilities.uses_shell && <Pill tone="bad">⚠ shell</Pill>}
-                          </div>
-                        </td>
-                        <td>
-                          <Pill tone={st.tone}>{t(st.key)}</Pill>
-                        </td>
-                        <td>
-                          <span className="keychip">v{s.latest_version ?? '—'}</span>
-                          {s.has_mini_app && <span className="u-sub"> · {t('miniApps.hasZip')}</span>}
-                        </td>
-                        <td className="tnum">
-                          {s.stats.downloads ? fmtCount(s.stats.downloads, lang) : '—'}
-                        </td>
-                        <td className="u-sub">›</td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="u-sub" style={{ padding: '18px 16px' }}>
-                      {t('miniApps.empty')}
-                    </td>
-                  </tr>
-                )}
+                {items.map((s) => {
+                  const st = scriptStatus[s.status]
+                  return (
+                    <tr key={s.id} className="rowlink" onClick={() => nav(`/mini-apps/${s.id}`)}>
+                      <td>
+                        <div className="u-main">{s.name}</div>
+                        <div className="u-sub">{s.short_description ?? s.slug}</div>
+                      </td>
+                      <td>
+                        <div className="chips">
+                          {s.capabilities.browser_platforms.map((p) => (
+                            <Pill key={p} tone="accent">
+                              {p}
+                            </Pill>
+                          ))}
+                          {s.capabilities.uses_shell && <Pill tone="bad">⚠ shell</Pill>}
+                        </div>
+                      </td>
+                      <td>
+                        <Pill tone={st.tone}>{t(st.key)}</Pill>
+                      </td>
+                      <td>
+                        <span className="keychip">v{s.latest_version ?? '—'}</span>
+                        {s.has_mini_app && <span className="u-sub"> · {t('miniApps.hasZip')}</span>}
+                      </td>
+                      <td className="tnum">
+                        {s.stats.downloads ? fmtCount(s.stats.downloads, lang) : '—'}
+                      </td>
+                      <td className="u-sub">›</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -302,9 +306,14 @@ function Preview({ info }: { info: ScriptInspect }) {
           )}
         </div>
       </div>
-      <div className="kv" style={{ marginBottom: 14 }}>
+      <div className="kv">
         <span className="klab">{t('preview.needs')}</span>
         <CapsChips caps={info.capabilities} />
+      </div>
+      <div className="kv" style={{ marginBottom: 14 }}>
+        <span className="klab">{t('detail.caps.node')}</span>
+        <b className="tnum">{info.node_count}</b>
+        <GroupChips groups={info.node_groups_used} />
       </div>
     </>
   )

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Card, CardHead } from '../ui/Card'
 import { Pill } from '../ui/Pill'
-import { ErrorState, Loading, PendingApproval } from '../ui/States'
+import { Empty, ErrorState, PendingApproval, TableSkeleton } from '../ui/States'
 import { useToast } from '../ui/Toast'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
@@ -60,7 +60,18 @@ export function Keys() {
           }
         />
         {keys.loading ? (
-          <Loading what={t('nav.keys').toLowerCase()} />
+          <TableSkeleton />
+        ) : !rows.length ? (
+          <Empty
+            icon="🔑"
+            title={t('detailKeys.emptyTitle')}
+            body={t('keys.empty')}
+            action={
+              <button className="btn pri sm" onClick={() => nav('/mini-apps')}>
+                {t('keys.goToApps')}
+              </button>
+            }
+          />
         ) : (
           <div className="tscroll">
             <table>
@@ -76,44 +87,43 @@ export function Keys() {
                 </tr>
               </thead>
               <tbody>
-                {rows.length ? (
-                  rows.map((k) => {
-                    const ks = keyStatus[k.status]
-                    return (
-                      <tr key={k.id}>
-                        <td>
-                          <span className="keychip">{k.key}</span>
-                        </td>
-                        <td>
-                          {k.script_name ? (
-                            <Pill tone="accent">{k.script_name}</Pill>
-                          ) : (
-                            <Pill tone="neutral">{t('keys.allApps')}</Pill>
-                          )}
-                        </td>
-                        <td>{k.label ?? '—'}</td>
-                        <td>
-                          <Pill tone={ks.tone}>{t(ks.key)}</Pill>
-                        </td>
-                        <td className="tnum">
-                          {k.used_count} / {k.max_uses ?? '∞'}
-                        </td>
-                        <td className="u-sub tnum">{fmtWhen(k.created_at, lang, t('time.now'))}</td>
-                        <td className="rowbtns">
-                          <button className="btn bad sm" disabled={k.status !== 'active'} onClick={() => revoke(k.id)}>
-                            {t('keys.revoke')}
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="u-sub" style={{ padding: '18px 16px' }}>
-                      {t('keys.empty')}
-                    </td>
-                  </tr>
-                )}
+                {rows.map((k) => {
+                  const ks = keyStatus[k.status]
+                  return (
+                    <tr key={k.id}>
+                      <td>
+                        <span className="keychip">{k.key}</span>
+                      </td>
+                      <td>
+                        {k.script_name ? (
+                          <Pill tone="accent">{k.script_name}</Pill>
+                        ) : (
+                          <Pill tone="neutral">{t('keys.allApps')}</Pill>
+                        )}
+                      </td>
+                      <td>
+                        {k.label ?? '—'}
+                        {k.expires_at && (
+                          <div className="u-sub">
+                            {t('detailKeys.expires')}: {new Date(k.expires_at).toLocaleDateString(lang)}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <Pill tone={ks.tone}>{t(ks.key)}</Pill>
+                      </td>
+                      <td className="tnum">
+                        {k.used_count} / {k.max_uses ?? '∞'}
+                      </td>
+                      <td className="u-sub tnum">{fmtWhen(k.created_at, lang, t('time.now'))}</td>
+                      <td className="rowbtns">
+                        <button className="btn bad sm" disabled={k.status !== 'active'} onClick={() => revoke(k.id)}>
+                          {t('keys.revoke')}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

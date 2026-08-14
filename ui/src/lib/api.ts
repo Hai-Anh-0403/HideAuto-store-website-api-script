@@ -73,6 +73,13 @@ export const api = {
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
 
+  patch: <T>(path: string, body: unknown): Promise<T> =>
+    request<T>(path, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
   /** Multipart upload — the browser sets the boundary, so no Content-Type here. */
   upload: <T>(path: string, form: FormData): Promise<T> =>
     request<T>(path, { method: 'POST', body: form }),

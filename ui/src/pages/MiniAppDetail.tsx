@@ -2,15 +2,16 @@ import { Fragment, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Card, CardHead } from '../ui/Card'
 import { CapsChips } from '../ui/CapsChips'
+import { GroupChips } from '../ui/GroupChips'
 import { Pill } from '../ui/Pill'
-import { ErrorState, Loading } from '../ui/States'
+import { Empty, ErrorState, Loading, TableSkeleton } from '../ui/States'
 import { useToast } from '../ui/Toast'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
 import { useErrorText } from '../lib/errors'
 import { buildStatus, fmtBytes, fmtWhen, keyStatus, nextVersion, scriptStatus, versionStatus } from '../lib/pills'
 import { useFetch } from '../lib/useFetch'
-import type { KeyItem, MiniAppBuild, ScriptDetail, ScriptVersion } from '../types'
+import type { KeyCreate, KeyItem, MiniAppBuild, ScriptDetail, ScriptVersion } from '../types'
 
 type Tab = 'ov' | 'ver' | 'keys' | 'mini'
 
@@ -60,10 +61,49 @@ export function MiniAppDetail() {
             })}
           </p>
         </div>
-        <span style={{ marginLeft: 'auto' }}>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <Pill tone={st.tone}>{t(st.key)}</Pill>
+          {s.status === 'archived' ? (
+            <button
+              className="btn sm"
+              onClick={() =>
+                run(async () => {
+                  await api.post(`/sellers/me/scripts/${s.id}/unarchive`)
+                  script.reload()
+                  return t('detail.unarchived', { name: s.name })
+                })
+              }
+            >
+              {t('detail.unarchive')}
+            </button>
+          ) : (
+            <button
+              className="btn bad sm"
+              onClick={() => {
+                // Hành động phá hủy: xác nhận có kèm tên đối tượng.
+                if (!window.confirm(t('detail.archiveConfirm', { name: s.name }))) return
+                void run(async () => {
+                  await api.post(`/sellers/me/scripts/${s.id}/archive`)
+                  script.reload()
+                  return t('detail.archived', { name: s.name })
+                })
+              }}
+            >
+              {t('detail.archive')}
+            </button>
+          )}
         </span>
       </div>
+
+      {s.status === 'archived' && (
+        <div className="banner warn">
+          <span className="bi">📦</span>
+          <div>
+            <b>{t('detail.archivedBanner')}</b>
+            {t('detail.archivedBannerBody')}
+          </div>
+        </div>
+      )}
 
       <div className="seg" style={{ marginBottom: 16 }}>
         <button className={tab === 'ov' ? 'on' : ''} onClick={() => setTab('ov')}>
@@ -84,6 +124,7 @@ export function MiniAppDetail() {
         <DetailOverview
           s={s}
           latest={latest}
+          onSaved={() => script.reload()}
           onSubmit={() =>
             run(async () => {
               await api.post(`/sellers/me/scripts/${s.id}/submit`)
@@ -109,11 +150,9 @@ export function MiniAppDetail() {
           keys={keys.data ?? []}
           loading={keys.loading}
           error={keys.error}
-          onCreate={(label) =>
+          onCreate={(payload) =>
             run(async () => {
-              const key = await api.post<KeyItem>(`/sellers/me/scripts/${s.id}/keys`, {
-                label: label || null,
-              })
+              const key = await api.post<KeyItem>(`/sellers/me/scripts/${s.id}/keys`, payload)
               keys.reload()
               return t('detailKeys.created', { key: key.key })
             })
@@ -156,17 +195,20 @@ export function MiniAppDetail() {
 function DetailOverview({
   s,
   latest,
+  onSaved,
   onSubmit,
   onDownloadGraph,
 }: {
   s: ScriptDetail
   latest: ScriptVersion | undefined
+  onSaved: () => void
   onSubmit: () => void
   onDownloadGraph: () => void
 }) {
   const { t } = useI18n()
   return (
     <>
+      <EditListing s={s} onSaved={onSaved} />
       <Card>
         <CardHead
           title={t('detail.caps.title')}
@@ -184,10 +226,8 @@ function DetailOverview({
         <div className="card-body">
           <div className="kv">
             <span className="klab">{t('detail.caps.node')}</span>
-            {t('detail.caps.nodeValue', {
-              count: s.node_count,
-              groups: s.node_groups_used.join(', ') || '—',
-            })}
+            <b className="tnum">{s.node_count}</b>
+            <GroupChips groups={s.node_groups_used} />
           </div>
           <div className="kv">
             <span className="klab">{t('detail.caps.needs')}</span>
@@ -225,6 +265,90 @@ function DetailOverview({
       </Card>
       <Moderation s={s} latest={latest} onSubmit={onSubmit} />
     </>
+  )
+}
+
+/** Sửa phần chữ của listing. Mọi thứ kỹ thuật vẫn do store suy ra từ graph. */
+function EditListing({ s, onSaved }: { s: ScriptDetail; onSaved: () => void }) {
+  const { t } = useI18n()
+  const { toast } = useToast()
+  const errorText = useErrorText()
+  const [name, setName] = useState(s.name)
+  const [short, setShort] = useState(s.short_description ?? '')
+  const [description, setDescription] = useState(s.description ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<unknown>(null)
+
+  const dirty =
+    name !== s.name ||
+    short !== (s.short_description ?? '') ||
+    description !== (s.description ?? '')
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      await api.patch(`/sellers/me/scripts/${s.id}`, {
+        name,
+        short_description: short || null,
+        description: description || null,
+      })
+      toast(t('detail.edit.saved'))
+      onSaved()
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHead title={t('detail.edit.title')} />
+      <form onSubmit={save} style={{ padding: 16 }}>
+        {error != null && <ErrorState message={errorText(error)} />}
+        <div className="grid2">
+          <label className="field">
+            <span>{t('detail.edit.name')}</span>
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              minLength={3}
+              maxLength={120}
+              required
+            />
+          </label>
+          <label className="field">
+            <span>{t('detail.edit.shortDescription')}</span>
+            <input
+              className="input"
+              value={short}
+              onChange={(e) => setShort(e.target.value)}
+              maxLength={200}
+              placeholder={t('detail.edit.shortPlaceholder')}
+            />
+          </label>
+        </div>
+        <label className="field">
+          <span>{t('detail.edit.description')}</span>
+          <textarea
+            className="input"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={20000}
+            placeholder={t('detail.edit.descriptionPlaceholder')}
+          />
+        </label>
+        <div className="formrow">
+          <button className="btn pri sm" type="submit" disabled={busy || !dirty}>
+            {busy ? t('detail.edit.saving') : t('detail.edit.save')}
+          </button>
+          <span className="note">{t('detail.edit.slugNote', { slug: s.slug })}</span>
+        </div>
+      </form>
+    </Card>
   )
 }
 
@@ -447,12 +571,12 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
                               <CapsChips caps={v.capabilities} />
                             </div>
                             <div className="kv">
-                              <span className="klab">{t('versions.nodes')}</span>{' '}
-                              {t('detail.caps.nodeValue', {
-                                count: v.node_count,
-                                groups: v.node_groups_used.join(', ') || '—',
-                              })}
-                              {v.uses_control_flow && ` ${t('versions.controlFlow')}`}
+                              <span className="klab">{t('versions.nodes')}</span>
+                              <b className="tnum">{v.node_count}</b>
+                              <GroupChips groups={v.node_groups_used} />
+                              {v.uses_control_flow && (
+                                <span className="u-sub">{t('versions.controlFlow')}</span>
+                              )}
                             </div>
                             {v.moderation.reason && (
                               <div className="kv">
@@ -500,40 +624,74 @@ function DetailKeys({
   keys: KeyItem[]
   loading: boolean
   error: string | null
-  onCreate: (label: string) => void
+  onCreate: (payload: KeyCreate) => void
   onRevoke: (keyId: string) => void
 }) {
   const { t } = useI18n()
   const [label, setLabel] = useState('')
+  const [maxUses, setMaxUses] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
+
+  const create = (e: FormEvent) => {
+    e.preventDefault()
+    onCreate({
+      label: label || null,
+      max_uses: maxUses ? Number(maxUses) : null,
+      // `datetime-local` không có múi giờ; Date rồi toISOString đưa về UTC cho API.
+      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+    })
+    setLabel('')
+    setMaxUses('')
+    setExpiresAt('')
+  }
 
   return (
     <Card>
-      <CardHead
-        title={t('detailKeys.title')}
-        actions={
-          <>
+      <CardHead title={t('detailKeys.title')} />
+      <form onSubmit={create} style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div className="grid2">
+          <label className="field">
+            <span>{t('keys.col.label')}</span>
             <input
-              className="search"
-              placeholder={t('detailKeys.labelPlaceholder')}
+              className="input"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
+              placeholder={t('detailKeys.labelPlaceholder')}
+              maxLength={100}
             />
-            <button
-              className="btn pri sm"
-              style={{ marginLeft: 8 }}
-              onClick={() => {
-                onCreate(label)
-                setLabel('')
-              }}
-            >
-              {t('detailKeys.create')}
-            </button>
-          </>
-        }
-      />
+          </label>
+          <label className="field">
+            <span>{t('detailKeys.maxUses')}</span>
+            <input
+              className="input tnum"
+              type="number"
+              min={1}
+              value={maxUses}
+              onChange={(e) => setMaxUses(e.target.value)}
+              placeholder={t('detailKeys.maxUsesPlaceholder')}
+            />
+          </label>
+        </div>
+        <div className="grid2">
+          <label className="field">
+            <span>{t('detailKeys.expires')}</span>
+            <input
+              className="input"
+              type="datetime-local"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+            />
+          </label>
+        </div>
+        <button className="btn pri sm" type="submit">
+          {t('detailKeys.create')}
+        </button>
+      </form>
       {error && <ErrorState message={error} />}
       {loading ? (
-        <Loading what={t('nav.keys').toLowerCase()} />
+        <TableSkeleton rows={3} />
+      ) : !keys.length ? (
+        <Empty icon="🔑" title={t('detailKeys.emptyTitle')} body={t('detailKeys.emptyBody')} />
       ) : (
         <div className="tscroll">
           <table>
@@ -547,36 +705,35 @@ function DetailKeys({
               </tr>
             </thead>
             <tbody>
-              {keys.length ? (
-                keys.map((k) => {
-                  const ks = keyStatus[k.status]
-                  return (
-                    <tr key={k.id}>
-                      <td>
-                        <span className="keychip">{k.key}</span>
-                      </td>
-                      <td>{k.label ?? '—'}</td>
-                      <td>
-                        <Pill tone={ks.tone}>{t(ks.key)}</Pill>
-                      </td>
-                      <td className="tnum">
-                        {k.used_count} / {k.max_uses ?? '∞'}
-                      </td>
-                      <td className="rowbtns">
-                        <button className="btn bad sm" disabled={k.status !== 'active'} onClick={() => onRevoke(k.id)}>
-                          {t('keys.revoke')}
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan={5} className="u-sub" style={{ padding: '18px 16px' }}>
-                    {t('detailKeys.empty')}
-                  </td>
-                </tr>
-              )}
+              {keys.map((k) => {
+                const ks = keyStatus[k.status]
+                return (
+                  <tr key={k.id}>
+                    <td>
+                      <span className="keychip">{k.key}</span>
+                    </td>
+                    <td>
+                      {k.label ?? '—'}
+                      {k.expires_at && (
+                        <div className="u-sub">
+                          {t('detailKeys.expires')}: {new Date(k.expires_at).toLocaleString()}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <Pill tone={ks.tone}>{t(ks.key)}</Pill>
+                    </td>
+                    <td className="tnum">
+                      {k.used_count} / {k.max_uses ?? '∞'}
+                    </td>
+                    <td className="rowbtns">
+                      <button className="btn bad sm" disabled={k.status !== 'active'} onClick={() => onRevoke(k.id)}>
+                        {t('keys.revoke')}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

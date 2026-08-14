@@ -59,7 +59,7 @@ export function Overview() {
           <div className="k">
             <span className="dot on" /> {t('overview.tile.online')}
           </div>
-          <div className="v tnum" style={{ color: 'var(--ok)' }}>
+          <div className="v tnum" style={{ color: 'var(--success)' }}>
             {online}
           </div>
           <div className="s">{t('overview.tile.onlineSub')}</div>
