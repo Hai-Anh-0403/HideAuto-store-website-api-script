@@ -1,14 +1,17 @@
 """Test fixtures: in-memory Mongo (mongomock-motor) + async HTTP client."""
 
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import httpx
 import mongomock.database
+import pytest
 import pytest_asyncio
 from beanie import init_beanie
 from fastapi import FastAPI
 from mongomock_motor import AsyncMongoMockClient
 
+from app.core.config import settings
 from app.core.database import DOCUMENT_MODELS
 from app.core.security import hash_password
 from app.main import create_app
@@ -27,6 +30,24 @@ mongomock.database.Database.list_collection_names = _list_collection_names  # ty
 
 ADMIN_EMAIL = "admin@teststore.com"
 ADMIN_PASSWORD = "admin12345"
+
+
+@pytest.fixture(autouse=True)
+def isolated_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the behavioural switches so a developer's own .env can't change results.
+
+    Tests that need these on set them explicitly.
+    """
+    monkeypatch.setattr(settings, "seller_auto_approve", False)
+    monkeypatch.setattr(settings, "mini_app_template_path", None)
+
+
+@pytest.fixture(autouse=True)
+def storage_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Every test writes artifacts into its own throwaway storage root."""
+    root = tmp_path / "storage"
+    monkeypatch.setattr(settings, "storage_dir", str(root))
+    return root
 
 
 @pytest_asyncio.fixture

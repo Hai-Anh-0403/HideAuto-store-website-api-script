@@ -117,7 +117,7 @@ Quét toàn bộ field trong graph theo pattern (khớp app `detectExportCredent
 
 Store **không giữ mãi file .exe khổng lồ**; nó giữ **graph nhỏ** rồi đóng gói lại khi cần.
 
-### 4.1 Server template-inject (mặc định — chạy được ngay)
+### 4.1 Server template-inject (mặc định — **đã code**)
 1. Store giữ sẵn **1 "template mini-app rỗng"** (bản app đã đóng gói, chưa có workflow) — nạp 1 lần / mỗi platform.
 2. Khi tải: **copy template** → ghi `resources/app.workflow` (graph đã tách, có thể chèn `appName/appId` riêng) → **zip**.
 3. Trả file cho buyer.
@@ -148,16 +148,48 @@ Chi tiết trường: [db/mongodb-catalog.md](./db/mongodb-catalog.md).
 
 ---
 
-## 6. Endpoint (dự kiến — chưa code)
+## 6. Endpoint
+
+Đã code (`api/app/api/v1/routes/scripts.py`, prefix `/api/v1`):
 
 | Method · Path | Việc |
 |---|---|
-| `POST /sellers/me/scripts` | upload gói/file → tách + scrub + derive → tạo script + version `pending_review` |
-| `POST /sellers/me/scripts/{id}/versions` | upload bản mới (quét & duyệt lại) |
-| `GET /sellers/me/scripts` · `/{id}` | liệt kê / chi tiết (capabilities, versions, builds, moderation) |
-| `POST /sellers/me/scripts/{id}/mini-app-builds` | đóng gói lại (server template) |
-| `GET /scripts/{id}/download?format=exe|hideflow` | buyer tải (repackage hoặc graph) |
-| `POST /admin/scripts/{id}/versions/{vid}/approve|reject` | duyệt |
+| `POST /sellers/me/scripts` | multipart (`file` + form) → tách + scrub + derive → script `draft` + version `pending_review` |
+| `POST /sellers/me/scripts/{id}/versions` | upload bản mới (quét & duyệt lại từ đầu) |
+| `POST /sellers/me/scripts/{id}/submit` | gửi duyệt (`draft`/`rejected` → `pending_review`) |
+| `GET /sellers/me/scripts` · `/{id}` | liệt kê / chi tiết (capabilities, versions, scan, moderation) |
+| `GET /admin/scripts` · `/{id}` | hàng đợi duyệt |
+| `POST /admin/scripts/{id}/versions/{vid}/approve` | duyệt → publish (**chặn nếu còn secret**) |
+| `POST /admin/scripts/{id}/versions/{vid}/reject` | từ chối kèm `reason` |
+| `POST /sellers/me/scripts/{id}/keys` · `GET …/keys` | phát hành / liệt kê khóa **mở đúng 1 mini app** |
+| `POST /sellers/me/scripts/{id}/mini-app-builds` | đóng gói lại `.zip` (server template inject) |
+| `GET /sellers/me/scripts/{id}/mini-app-builds` | liệt kê bản đóng gói |
+| `GET /sellers/me/scripts/{id}/download?format=graph\|exe` | seller tải artifact của chính mình |
+| `GET /app/scripts` | end-user liệt kê mini app **đã mở khóa** |
+| `GET /app/scripts/{id}/download?format=exe\|graph` | end-user tải (kiểm tra entitlement) |
+
+### 6.2 Khóa & quyền truy cập
+
+- `seller_keys.script_id` = mini app mà khóa mở. `null` = khóa toàn shop (khóa cũ, mở mọi app).
+- Redeem khóa → `seller_members.script_ids` thêm app đó (`all_scripts = true` với khóa toàn shop).
+  Cùng 1 user redeem nhiều khóa của cùng seller ⇒ vẫn 1 membership, cộng dồn danh sách app.
+- Tải về yêu cầu: script `published` + membership `active` + app nằm trong entitlement.
+
+### 6.1 Khác biệt so với thiết kế ban đầu (đã code thế này)
+
+- **`.hideflow` mã hoá chưa nhận** — key giải mã nằm trong app, server không có. Upload `.hideflow`
+  trả 422 kèm thông báo rõ. Nhận: gói mini-app `.zip`/`.exe` (thực chất là zip) và file
+  `app.workflow` / graph `.json`.
+- **Không lưu gói gốc.** Gói `.exe`/`.zip` chứa nguyên secret của seller và rất nặng, nên store
+  **chỉ lưu graph đã scrub**; version giữ `source_filename` + `source_checksum` để truy vết.
+  (Đúng tinh thần [§7](#7-bảo-mật-nhắc-lại--quan-trọng) và guardrail "không bao giờ lưu secret".)
+  ⇒ `script_versions.source_upload_id` / `uploads(kind=mini_app_source)` hiện không dùng.
+- **`sub_script_ids` → `sub_workflow_ids`** (`array<string>`): node `runOtherScript` chỉ có
+  `workflowId` phía app, không map được sang `_id` của store.
+- **`category_id` / `tag_ids` optional** — collection `categories` / `tags` chưa dựng.
+- **Scrub + derive chạy trong threadpool** (`asyncio.to_thread`) và **trước khi ghi DB**, nên
+  upload hỏng không để lại script rỗng.
+- **Lưu file**: content-addressed theo sha256 dưới `STORAGE_DIR` (`uploads.storage = local`).
 
 ---
 

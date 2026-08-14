@@ -25,6 +25,18 @@ class Settings(BaseSettings):
     flowdesk_base_url: str = "https://flowdesk.hachitechsolution.com/api"
     flowdesk_service_token: str | None = None
 
+    # Artifact storage (uploaded packages + extracted graphs)
+    storage_dir: str = "var/storage"
+    max_upload_bytes: int = 200 * 1024 * 1024
+
+    # Empty mini-app template (a zipped packaged hideflow app, no workflow embedded).
+    # Required to repackage downloads as .zip; unset ⇒ only graph downloads work.
+    mini_app_template_path: str | None = None
+
+    # Dev convenience: new sellers are approved on registration instead of waiting for an
+    # admin. Leave off in production — it lets anyone publish to the store.
+    seller_auto_approve: bool = False
+
     # Initial admin (seeded on startup if no admin exists)
     initial_admin_email: str | None = None
     initial_admin_password: str | None = None

@@ -1,12 +1,14 @@
 """Shared FastAPI dependencies: auth (seller/admin/app-user) + pagination."""
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from beanie import PydanticObjectId
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel, ValidationError
 
 from app.core.enums import Role, SellerStatus
+from app.core.exceptions import ForbiddenError
 from app.core.security import decode_access_token
 from app.models.admin import Admin
 from app.models.seller import Seller
@@ -39,9 +41,8 @@ async def require_approved_seller(
     seller: Annotated[Seller, Depends(get_current_seller)],
 ) -> Seller:
     if seller.status != SellerStatus.APPROVED:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Seller not approved (status={seller.status.value})",
+        raise ForbiddenError(
+            f"Seller not approved (status={seller.status.value})", code="seller_not_approved"
         )
     return seller
 
@@ -80,6 +81,22 @@ async def get_current_app_user(
     identity: Annotated[AppIdentity, Depends(get_app_identity)],
 ) -> flowdesk_client.FlowdeskUser:
     return identity.user
+
+
+def build_form_model[T: BaseModel](model: type[T], **fields: Any) -> T:
+    """Validate multipart form fields through a Pydantic schema.
+
+    FastAPI can only flatten a form model when it is the request's *only* body param;
+    these endpoints also carry a file part, so the fields are declared one by one and
+    the schema still owns every constraint. Failures come back as a normal 422.
+    """
+    try:
+        return model(**fields)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(include_url=False, include_context=False, include_input=False),
+        ) from exc
 
 
 class Pagination:

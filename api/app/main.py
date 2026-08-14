@@ -29,7 +29,10 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(AppError)
     async def _app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        # `code` lets clients show a translated message; `detail` is the English fallback.
+        return JSONResponse(
+            status_code=exc.status_code, content={"detail": exc.detail, "code": exc.code}
+        )
 
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, str]:
