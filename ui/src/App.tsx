@@ -1,12 +1,21 @@
 import { Route, Routes } from 'react-router-dom'
+import { useI18n } from './i18n'
 import { AppShell } from './layout/AppShell'
 import { Keys } from './pages/Keys'
+import { Login } from './pages/Login'
 import { Members } from './pages/Members'
 import { MiniAppDetail } from './pages/MiniAppDetail'
 import { MiniApps } from './pages/MiniApps'
 import { Overview } from './pages/Overview'
+import { useAuth } from './store/auth'
 
 export function App() {
+  const { seller, ready } = useAuth()
+  const { t } = useI18n()
+
+  if (!ready) return <div className="state">{t('common.loadingShort')}</div>
+  if (!seller) return <Login />
+
   return (
     <Routes>
       <Route element={<AppShell />}>
@@ -15,6 +24,7 @@ export function App() {
         <Route path="mini-apps/:id" element={<MiniAppDetail />} />
         <Route path="keys" element={<Keys />} />
         <Route path="members" element={<Members />} />
+        <Route path="*" element={<Overview />} />
       </Route>
     </Routes>
   )

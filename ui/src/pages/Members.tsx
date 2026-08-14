@@ -1,109 +1,166 @@
+import { useState } from 'react'
 import { Card, CardHead } from '../ui/Card'
 import { Pill } from '../ui/Pill'
-import { useAppData } from '../store/AppData'
+import { ErrorState, Loading, PendingApproval } from '../ui/States'
 import { useToast } from '../ui/Toast'
-import type { Member } from '../types'
+import { useI18n } from '../i18n'
+import { api } from '../lib/api'
+import { useErrorText } from '../lib/errors'
+import { fmtWhen, isOnline } from '../lib/pills'
+import { useFetch } from '../lib/useFetch'
+import { useAuth } from '../store/auth'
+import type { Member, Page, Script } from '../types'
 
 export function Members() {
-  const { members, scripts, toggleMemberBlock } = useAppData()
+  const { seller } = useAuth()
+  const { t, lang } = useI18n()
+  const errorText = useErrorText()
+  const approved = seller?.status === 'approved'
   const { toast } = useToast()
-  const total = scripts.length
-  const appName = (id: string) => scripts.find((s) => s.id === id)?.name ?? id
+  const [q, setQ] = useState('')
 
-  const onBlock = (i: number, m: Member) => {
-    toggleMemberBlock(i)
-    toast(m.status === 'blocked' ? `Đã bỏ chặn ${m.email}` : `Đã chặn ${m.email}`)
+  const members = useFetch(
+    () => (approved ? api.get<Page<Member>>('/sellers/me/members?limit=100') : Promise.resolve(null)),
+    `members:${approved}`,
+  )
+  const scripts = useFetch(
+    () => (approved ? api.get<Page<Script>>('/sellers/me/scripts?limit=100') : Promise.resolve(null)),
+    `scripts:${approved}`,
+  )
+
+  const scriptItems = scripts.data?.items ?? []
+  const nameOf = (id: string) => scriptItems.find((s) => s.id === id)?.name ?? id
+  const needle = q.trim().toLowerCase()
+  const rows = (members.data?.items ?? []).filter(
+    (m) => !needle || (m.user_email ?? '').toLowerCase().includes(needle),
+  )
+
+  const toggleBlock = async (m: Member) => {
+    const action = m.status === 'blocked' ? 'unblock' : 'block'
+    try {
+      await api.post(`/sellers/me/members/${m.id}/${action}`)
+      members.reload()
+      const email = m.user_email ?? m.user_id
+      toast(action === 'block' ? t('members.blocked', { email }) : t('members.unblocked', { email }))
+    } catch (err) {
+      toast(errorText(err))
+    }
   }
 
   return (
     <>
       <div className="vhead">
         <div>
-          <h2>Người dùng của tôi</h2>
-          <p>
-            Ai đã nhập khóa, <b>đang dùng mini app nào</b> của bạn (khóa nào → app đó).
-          </p>
+          <h2>{t('members.title')}</h2>
+          <p>{t('members.subtitle')}</p>
         </div>
         <span className="ep">
           <b>GET</b> /sellers/me/members
         </span>
       </div>
 
+      {!approved && <PendingApproval />}
+      {(members.error ?? scripts.error) && <ErrorState message={members.error ?? scripts.error ?? ''} />}
+
       <Card>
         <CardHead
-          title={`${members.length} người dùng`}
+          title={t('members.count', { count: members.data?.total ?? 0 })}
           actions={
             <>
-              <input className="search" placeholder="Tìm theo email…" />
-              <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => toast('Đã đồng bộ trạng thái từ flowdesk')}>
-                ↻ Làm mới
+              <input
+                className="search"
+                placeholder={t('members.search')}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+              <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => members.reload()}>
+                {t('common.refresh')}
               </button>
             </>
           }
         />
-        <div className="tscroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Người dùng</th>
-                <th>Trạng thái</th>
-                <th>Đang dùng</th>
-                <th>Online</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m, i) => (
-                <tr key={m.uid}>
-                  <td>
-                    <div className="u-main">{m.name}</div>
-                    <div className="u-sub">
-                      {m.email} · <span className="mono">{m.uid}</span>
-                    </div>
-                  </td>
-                  <td>{m.status === 'blocked' ? <Pill tone="bad">Bị chặn</Pill> : <Pill tone="ok">Active</Pill>}</td>
-                  <td>
-                    <div className="chips">
-                      {m.apps.map((a) => (
-                        <span key={a.id} title={`Khóa: ${a.key}`}>
-                          <Pill tone="accent">{appName(a.id)}</Pill>
-                        </span>
-                      ))}
-                    </div>
-                    <div className="u-sub tnum" style={{ marginTop: 4 }}>
-                      {m.apps.length}/{total} app
-                    </div>
-                  </td>
-                  <td>
-                    {m.online ? (
-                      <Pill tone="ok">
-                        <span className="dot on live" /> Online
-                      </Pill>
-                    ) : (
-                      <Pill tone="neutral">
-                        <span className="dot off" /> {m.last}
-                      </Pill>
-                    )}
-                  </td>
-                  <td className="rowbtns">
-                    {m.status === 'blocked' ? (
-                      <button className="btn ok sm" onClick={() => onBlock(i, m)}>
-                        Bỏ chặn
-                      </button>
-                    ) : (
-                      <button className="btn bad sm" onClick={() => onBlock(i, m)}>
-                        Chặn
-                      </button>
-                    )}
-                  </td>
+        {members.loading ? (
+          <Loading what={t('nav.members').toLowerCase()} />
+        ) : (
+          <div className="tscroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t('members.col.user')}</th>
+                  <th>{t('members.col.status')}</th>
+                  <th>{t('members.col.using')}</th>
+                  <th>{t('members.col.online')}</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.length ? (
+                  rows.map((m) => (
+                    <tr key={m.id}>
+                      <td>
+                        <div className="u-main">{m.user_name ?? m.user_email ?? m.user_id}</div>
+                        <div className="u-sub">
+                          {m.user_email} · <span className="mono">{m.user_id}</span>
+                        </div>
+                      </td>
+                      <td>
+                        {m.status === 'blocked' ? (
+                          <Pill tone="bad">{t('status.member.blocked')}</Pill>
+                        ) : (
+                          <Pill tone="ok">{t('status.member.active')}</Pill>
+                        )}
+                      </td>
+                      <td>
+                        <div className="chips">
+                          {m.all_scripts && <Pill tone="accent">{t('members.allApps')}</Pill>}
+                          {m.script_ids.map((id) => (
+                            <Pill key={id} tone="accent">
+                              {nameOf(id)}
+                            </Pill>
+                          ))}
+                        </div>
+                        <div className="u-sub tnum" style={{ marginTop: 4 }}>
+                          {t('members.appCount', {
+                            used: m.all_scripts ? scriptItems.length : m.script_ids.length,
+                            total: scriptItems.length,
+                          })}
+                        </div>
+                      </td>
+                      <td>
+                        {isOnline(m.last_seen_at) ? (
+                          <Pill tone="ok">
+                            <span className="dot on live" /> {t('members.online')}
+                          </Pill>
+                        ) : (
+                          <Pill tone="neutral">
+                            <span className="dot off" /> {fmtWhen(m.last_seen_at, lang, t('time.now'))}
+                          </Pill>
+                        )}
+                      </td>
+                      <td className="rowbtns">
+                        <button
+                          className={m.status === 'blocked' ? 'btn ok sm' : 'btn bad sm'}
+                          onClick={() => toggleBlock(m)}
+                        >
+                          {m.status === 'blocked' ? t('members.unblock') : t('members.block')}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="u-sub" style={{ padding: '18px 16px' }}>
+                      {t('members.empty')}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
         <div className="card-foot">
           <span className="note">
-            <b>Đang dùng</b> = số mini app user đã mở khóa / tổng mini app. Di chuột vào chip để xem <b>khóa nào</b>.{' '}
+            {t('members.foot')}{' '}
             <span className="mono">POST /sellers/me/members/{'{id}'}/block</span>
           </span>
         </div>

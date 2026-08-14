@@ -1,24 +1,26 @@
 import { NavLink } from 'react-router-dom'
+import { useI18n, type MessageKey } from '../i18n'
 import styles from './Sidebar.module.css'
 
-const NAV = [
-  { to: '/', label: 'Tổng quan', icon: '📊', end: true },
-  { to: '/mini-apps', label: 'Mini app của tôi', icon: '🧩', end: false },
-  { to: '/keys', label: 'Khóa kích hoạt', icon: '🔑', end: false },
-  { to: '/members', label: 'Người dùng của tôi', icon: '👥', end: false },
+const NAV: { to: string; key: MessageKey; icon: string; end: boolean }[] = [
+  { to: '/', key: 'nav.overview', icon: '📊', end: true },
+  { to: '/mini-apps', key: 'nav.miniApps', icon: '🧩', end: false },
+  { to: '/keys', key: 'nav.keys', icon: '🔑', end: false },
+  { to: '/members', key: 'nav.members', icon: '👥', end: false },
 ]
 
 export function Sidebar() {
+  const { t } = useI18n()
   return (
     <aside className={styles.side}>
       <div className={styles.brand}>
         <div className={styles.logo}>S</div>
         <div>
           <b>storeAutoHide</b>
-          <span>mini app store</span>
+          <span>{t('nav.tagline')}</span>
         </div>
       </div>
-      <div className={styles.navlabel}>Cửa hàng của tôi</div>
+      <div className={styles.navlabel}>{t('nav.group')}</div>
       <nav className={styles.navgroup}>
         {NAV.map((n) => (
           <NavLink
@@ -28,11 +30,11 @@ export function Sidebar() {
             className={({ isActive }) => (isActive ? `${styles.nav} ${styles.active}` : styles.nav)}
           >
             <span className={styles.ic}>{n.icon}</span>
-            {n.label}
+            {t(n.key)}
           </NavLink>
         ))}
       </nav>
-      <div className={styles.foot}>Bản demo UI — dữ liệu mẫu.</div>
+      <div className={styles.foot}>{t('nav.foot')}</div>
     </aside>
   )
 }

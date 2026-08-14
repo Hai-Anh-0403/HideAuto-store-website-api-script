@@ -1,84 +1,126 @@
 import { useNavigate } from 'react-router-dom'
 import { Card, CardHead } from '../ui/Card'
 import { Pill } from '../ui/Pill'
-import { keyStatus } from '../lib/pills'
-import { useAppData } from '../store/AppData'
+import { ErrorState, Loading, PendingApproval } from '../ui/States'
+import { useToast } from '../ui/Toast'
+import { useI18n } from '../i18n'
+import { api } from '../lib/api'
+import { useErrorText } from '../lib/errors'
+import { fmtWhen, keyStatus } from '../lib/pills'
+import { useFetch } from '../lib/useFetch'
+import { useAuth } from '../store/auth'
+import type { KeyItem } from '../types'
 
 export function Keys() {
-  const { scripts } = useAppData()
+  const { seller } = useAuth()
+  const { t, lang } = useI18n()
+  const errorText = useErrorText()
+  const approved = seller?.status === 'approved'
   const nav = useNavigate()
-  const rows = scripts.flatMap((s) => s.keys.map((k) => ({ ...k, app: s.name })))
+  const { toast } = useToast()
+
+  const keys = useFetch(
+    () => (approved ? api.get<KeyItem[]>('/sellers/me/keys') : Promise.resolve(null)),
+    `keys:${approved}`,
+  )
+  const rows = keys.data ?? []
+
+  const revoke = async (keyId: string) => {
+    try {
+      await api.post(`/sellers/me/keys/${keyId}/revoke`)
+      keys.reload()
+      toast(t('keys.revoked'))
+    } catch (err) {
+      toast(errorText(err, 'keys.revokeFailed'))
+    }
+  }
 
   return (
     <>
       <div className="vhead">
         <div>
-          <h2>Khóa kích hoạt</h2>
-          <p>
-            Mỗi khóa mở <b>đúng 1 mini app</b> — tạo khóa ngay trong trang mini app để khỏi nhầm.
-          </p>
+          <h2>{t('keys.title')}</h2>
+          <p>{t('keys.subtitle')}</p>
         </div>
         <span className="ep">
           <b>GET</b> /sellers/me/keys
         </span>
       </div>
 
+      {!approved && <PendingApproval />}
+      {keys.error && <ErrorState message={keys.error} />}
+
       <Card>
         <CardHead
-          title="Tất cả khóa"
+          title={t('keys.count', { count: rows.length })}
           actions={
             <button className="btn pri sm" onClick={() => nav('/mini-apps')}>
-              → Vào mini app để tạo khóa
+              {t('keys.goToApps')}
             </button>
           }
         />
-        <div className="tscroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Khóa</th>
-                <th>Mini app</th>
-                <th>Nhãn</th>
-                <th>Trạng thái</th>
-                <th>Đã dùng</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length ? (
-                rows.map((r) => {
-                  const ks = keyStatus[r.status]
-                  return (
-                    <tr key={r.k}>
-                      <td>
-                        <span className="keychip">{r.k}</span>
-                      </td>
-                      <td>
-                        <Pill tone="accent">{r.app}</Pill>
-                      </td>
-                      <td>{r.label || '—'}</td>
-                      <td>
-                        <Pill tone={ks.tone}>{ks.label}</Pill>
-                      </td>
-                      <td className="tnum">
-                        {r.used} / {r.max == null ? '∞' : r.max}
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
+        {keys.loading ? (
+          <Loading what={t('nav.keys').toLowerCase()} />
+        ) : (
+          <div className="tscroll">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={5} className="u-sub" style={{ padding: '18px 16px' }}>
-                    Chưa có khóa. Vào từng mini app để tạo khóa.
-                  </td>
+                  <th>{t('keys.col.key')}</th>
+                  <th>{t('keys.col.app')}</th>
+                  <th>{t('keys.col.label')}</th>
+                  <th>{t('keys.col.status')}</th>
+                  <th>{t('keys.col.used')}</th>
+                  <th>{t('keys.col.created')}</th>
+                  <th />
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.length ? (
+                  rows.map((k) => {
+                    const ks = keyStatus[k.status]
+                    return (
+                      <tr key={k.id}>
+                        <td>
+                          <span className="keychip">{k.key}</span>
+                        </td>
+                        <td>
+                          {k.script_name ? (
+                            <Pill tone="accent">{k.script_name}</Pill>
+                          ) : (
+                            <Pill tone="neutral">{t('keys.allApps')}</Pill>
+                          )}
+                        </td>
+                        <td>{k.label ?? '—'}</td>
+                        <td>
+                          <Pill tone={ks.tone}>{t(ks.key)}</Pill>
+                        </td>
+                        <td className="tnum">
+                          {k.used_count} / {k.max_uses ?? '∞'}
+                        </td>
+                        <td className="u-sub tnum">{fmtWhen(k.created_at, lang, t('time.now'))}</td>
+                        <td className="rowbtns">
+                          <button className="btn bad sm" disabled={k.status !== 'active'} onClick={() => revoke(k.id)}>
+                            {t('keys.revoke')}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="u-sub" style={{ padding: '18px 16px' }}>
+                      {t('keys.empty')}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
         <div className="card-foot">
           <span className="note">
-            User nhập khóa → mở đúng mini app tương ứng.{' '}
-            <span className="mono">POST /sellers/me/scripts/{'{id}'}/keys</span>
+            {t('keys.foot')} <span className="mono">POST /sellers/me/scripts/{'{id}'}/keys</span>
           </span>
         </div>
       </Card>
