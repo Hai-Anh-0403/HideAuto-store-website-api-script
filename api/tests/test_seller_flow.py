@@ -13,6 +13,7 @@ import pytest
 from fastapi import FastAPI
 
 from app.api.deps import AppIdentity, get_app_identity
+from app.core.config import settings
 from app.services import flowdesk_client
 from app.services.flowdesk_client import FlowdeskUser
 from tests.conftest import ADMIN_EMAIL, ADMIN_PASSWORD
@@ -77,9 +78,7 @@ async def test_full_flow(
     assert r.status_code == 200
     assert r.json()["total"] == 1
 
-    r = await client.post(
-        f"/api/v1/admin/sellers/{seller_id}/approve", headers=_auth(admin_token)
-    )
+    r = await client.post(f"/api/v1/admin/sellers/{seller_id}/approve", headers=_auth(admin_token))
     assert r.status_code == 200
     assert r.json()["status"] == "approved"
 
@@ -157,6 +156,30 @@ async def test_full_flow(
 
     r = await client.get(f"/api/v1/admin/members/{member_id}", headers=_auth(admin_token))
     assert r.json()["status"] == "blocked"
+
+
+async def test_auto_approve_lets_a_new_seller_work_immediately(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SELLER_AUTO_APPROVE skips the admin gate — used for local/dev setups."""
+    monkeypatch.setattr(settings, "seller_auto_approve", True)
+
+    r = await client.post(
+        "/api/v1/sellers/register",
+        json={"email": "instant@teststore.com", "password": "seller12345", "name": "Instant"},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "approved"
+
+    r = await client.post(
+        "/api/v1/sellers/login",
+        json={"email": "instant@teststore.com", "password": "seller12345"},
+    )
+    token = r.json()["access_token"]
+
+    # No admin step in between: the seller-only endpoints already work.
+    r = await client.post("/api/v1/sellers/me/keys", json={}, headers=_auth(token))
+    assert r.status_code == 201, r.text
 
 
 async def test_bad_key_redeem(client: httpx.AsyncClient, app: FastAPI) -> None:

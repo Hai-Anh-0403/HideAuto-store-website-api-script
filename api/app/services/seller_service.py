@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from beanie import PydanticObjectId
 
+from app.core.config import settings
 from app.core.enums import SellerStatus
 from app.core.exceptions import AuthError, ConflictError, NotFoundError
 from app.core.security import hash_password, verify_password
@@ -13,14 +14,22 @@ from app.schemas.seller import SellerRegister
 
 
 async def register(data: SellerRegister) -> Seller:
+    """Register a seller — `pending` until an admin approves.
+
+    `SELLER_AUTO_APPROVE=true` skips that gate so a fresh account can publish right away.
+    It is a dev convenience: with it on, anyone who can reach the API can list scripts.
+    `approved_by` stays empty because no admin actually looked at the account.
+    """
     if await seller_repo.get_by_email(data.email) is not None:
         raise ConflictError("Email already registered")
+    auto = settings.seller_auto_approve
     seller = Seller(
         email=data.email,
         password_hash=hash_password(data.password),
         name=data.name,
         contact=data.contact,
-        status=SellerStatus.PENDING,
+        status=SellerStatus.APPROVED if auto else SellerStatus.PENDING,
+        approved_at=datetime.now(UTC) if auto else None,
     )
     return await seller_repo.insert(seller)
 
