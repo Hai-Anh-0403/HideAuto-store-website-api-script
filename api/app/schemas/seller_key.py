@@ -18,6 +18,8 @@ class KeyRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: PydanticObjectId
+    script_id: PydanticObjectId | None
+    script_name: str | None
     key: str
     label: str | None
     status: KeyStatus

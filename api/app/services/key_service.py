@@ -7,8 +7,10 @@ from pymongo.errors import DuplicateKeyError
 
 from app.core.enums import KeyStatus, MemberStatus, SellerStatus
 from app.core.exceptions import ForbiddenError, NotFoundError
+from app.models.script import Script
 from app.models.seller_key import SellerKey
 from app.models.seller_member import SellerMember
+from app.repositories import script as script_repo
 from app.repositories import seller as seller_repo
 from app.repositories import seller_key as key_repo
 from app.repositories import seller_member as member_repo
@@ -19,10 +21,15 @@ from app.utils.ids import generate_key
 _MAX_KEYGEN_RETRIES = 5
 
 
-async def create_key(seller_id: PydanticObjectId, data: KeyCreate) -> SellerKey:
+async def create_key(
+    seller_id: PydanticObjectId, data: KeyCreate, *, script: Script | None = None
+) -> SellerKey:
+    """Issue a key. Bound to one script when given, otherwise seller-wide."""
     for _ in range(_MAX_KEYGEN_RETRIES):
         key = SellerKey(
             seller_id=seller_id,
+            script_id=script.id if script is not None else None,
+            script_name=script.name if script is not None else None,
             key=generate_key(),
             label=data.label,
             max_uses=data.max_uses,
@@ -35,8 +42,32 @@ async def create_key(seller_id: PydanticObjectId, data: KeyCreate) -> SellerKey:
     raise RuntimeError("Could not generate a unique key")
 
 
+async def _owned_script(seller_id: PydanticObjectId, script_id: PydanticObjectId) -> Script:
+    script = await script_repo.get_by_id(script_id)
+    if script is None:
+        raise NotFoundError("Script not found")
+    if script.seller.id != seller_id:
+        raise ForbiddenError("Not your script")
+    return script
+
+
+async def create_script_key(
+    seller_id: PydanticObjectId, script_id: PydanticObjectId, data: KeyCreate
+) -> SellerKey:
+    """Issue a key that unlocks exactly one of the seller's mini apps."""
+    script = await _owned_script(seller_id, script_id)
+    return await create_key(seller_id, data, script=script)
+
+
 async def list_keys(seller_id: PydanticObjectId) -> list[SellerKey]:
     return await key_repo.list_for_seller(seller_id)
+
+
+async def list_script_keys(
+    seller_id: PydanticObjectId, script_id: PydanticObjectId
+) -> list[SellerKey]:
+    await _owned_script(seller_id, script_id)
+    return await key_repo.list_for_script(seller_id, script_id)
 
 
 async def revoke_key(seller_id: PydanticObjectId, key_id: PydanticObjectId) -> SellerKey:
@@ -48,6 +79,25 @@ async def revoke_key(seller_id: PydanticObjectId, key_id: PydanticObjectId) -> S
     key.status = KeyStatus.REVOKED
     await key.save()
     return key
+
+
+def _grant_access(member: SellerMember, key: SellerKey) -> bool:
+    """Unlock what the key covers. Returns False when the user already had it."""
+    if key.script_id is None:
+        if member.all_scripts:
+            return False
+        member.all_scripts = True
+        return True
+    if key.script_id in member.script_ids:
+        return False
+    member.script_ids = [*member.script_ids, key.script_id]
+    return True
+
+
+def is_entitled(member: SellerMember, script_id: PydanticObjectId) -> bool:
+    return member.status == MemberStatus.ACTIVE and (
+        member.all_scripts or script_id in member.script_ids
+    )
 
 
 async def redeem_key(key_str: str, user: FlowdeskUser) -> SellerMember:
@@ -66,11 +116,16 @@ async def redeem_key(key_str: str, user: FlowdeskUser) -> SellerMember:
 
     existing = await member_repo.get(key.seller_id, user.id)
     if existing is not None:
-        # Already linked to this seller — idempotent; refresh snapshot.
+        # Already linked to this seller — idempotent, but each new key still unlocks the
+        # mini app it belongs to.
         existing.user_email = user.email
         existing.user_name = user.name
         existing.status = MemberStatus.ACTIVE
+        newly_unlocked = _grant_access(existing, key)
         await existing.save()
+        if newly_unlocked:
+            key.used_count += 1
+            await key.save()
         return existing
 
     member = SellerMember(
@@ -80,6 +135,7 @@ async def redeem_key(key_str: str, user: FlowdeskUser) -> SellerMember:
         user_email=user.email,
         user_name=user.name,
     )
+    _grant_access(member, key)
     created = await member_repo.insert(member)
     # NOTE: non-atomic counter; acceptable for first slice. Revisit with $inc if needed.
     key.used_count += 1

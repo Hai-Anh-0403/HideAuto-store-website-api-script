@@ -21,6 +21,10 @@ class SellerMember(Document):
     user_email: str | None = None
     user_name: str | None = None
     status: MemberStatus = MemberStatus.ACTIVE
+    # What this user unlocked here: one entry per redeemed script key. A seller-wide key
+    # sets `all_scripts` instead of listing them.
+    script_ids: list[PydanticObjectId] = Field(default_factory=list)
+    all_scripts: bool = False
     # Usage cache (from flowdesk GET /devices via the end-user's token on redeem/heartbeat).
     last_seen_at: datetime | None = None
     devices: list[dict[str, Any]] = Field(default_factory=list)

@@ -16,6 +16,8 @@ class MemberRead(BaseModel):
     user_email: str | None
     user_name: str | None
     status: MemberStatus
+    script_ids: list[PydanticObjectId] = []
+    all_scripts: bool = False
     last_seen_at: datetime | None
     blocked_devices: list[str] = []
     redeemed_at: datetime

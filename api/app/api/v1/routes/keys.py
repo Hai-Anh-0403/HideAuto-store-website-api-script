@@ -24,6 +24,25 @@ async def list_keys(seller: ApprovedSeller) -> list[KeyRead]:
     return [KeyRead.model_validate(k) for k in keys]
 
 
+@router.post(
+    "/sellers/me/scripts/{script_id}/keys",
+    response_model=KeyRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Issue a key that unlocks this mini app",
+)
+async def create_script_key(
+    script_id: PydanticObjectId, payload: KeyCreate, seller: ApprovedSeller
+) -> KeyRead:
+    key = await key_service.create_script_key(require_id(seller.id), script_id, payload)
+    return KeyRead.model_validate(key)
+
+
+@router.get("/sellers/me/scripts/{script_id}/keys", response_model=list[KeyRead])
+async def list_script_keys(script_id: PydanticObjectId, seller: ApprovedSeller) -> list[KeyRead]:
+    keys = await key_service.list_script_keys(require_id(seller.id), script_id)
+    return [KeyRead.model_validate(k) for k in keys]
+
+
 @router.post("/sellers/me/keys/{key_id}/revoke", response_model=KeyRead)
 async def revoke_key(key_id: PydanticObjectId, seller: ApprovedSeller) -> KeyRead:
     key = await key_service.revoke_key(require_id(seller.id), key_id)

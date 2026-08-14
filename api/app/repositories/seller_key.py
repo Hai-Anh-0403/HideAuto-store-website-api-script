@@ -19,3 +19,13 @@ async def insert(key: SellerKey) -> SellerKey:
 
 async def list_for_seller(seller_id: PydanticObjectId) -> list[SellerKey]:
     return await SellerKey.find(SellerKey.seller_id == seller_id).sort("-created_at").to_list()
+
+
+async def list_for_script(
+    seller_id: PydanticObjectId, script_id: PydanticObjectId
+) -> list[SellerKey]:
+    return await (
+        SellerKey.find(SellerKey.seller_id == seller_id, SellerKey.script_id == script_id)
+        .sort("-created_at")
+        .to_list()
+    )
