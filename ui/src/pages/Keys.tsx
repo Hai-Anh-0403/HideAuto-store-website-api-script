@@ -42,9 +42,6 @@ export function Keys() {
           <h2>{t('keys.title')}</h2>
           <p>{t('keys.subtitle')}</p>
         </div>
-        <span className="ep">
-          <b>GET</b> /sellers/me/keys
-        </span>
       </div>
 
       {!approved && <PendingApproval />}
@@ -129,9 +126,7 @@ export function Keys() {
           </div>
         )}
         <div className="card-foot">
-          <span className="note">
-            {t('keys.foot')} <span className="mono">POST /sellers/me/scripts/{'{id}'}/keys</span>
-          </span>
+          <span className="note">{t('keys.foot')}</span>
         </div>
       </Card>
     </>

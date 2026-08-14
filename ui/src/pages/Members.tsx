@@ -56,9 +56,6 @@ export function Members() {
           <h2>{t('members.title')}</h2>
           <p>{t('members.subtitle')}</p>
         </div>
-        <span className="ep">
-          <b>GET</b> /sellers/me/members
-        </span>
       </div>
 
       {!approved && <PendingApproval />}
@@ -170,10 +167,7 @@ export function Members() {
           </div>
         )}
         <div className="card-foot">
-          <span className="note">
-            {t('members.foot')}{' '}
-            <span className="mono">POST /sellers/me/members/{'{id}'}/block</span>
-          </span>
+          <span className="note">{t('members.foot')}</span>
         </div>
       </Card>
     </>

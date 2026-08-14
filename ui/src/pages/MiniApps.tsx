@@ -34,9 +34,6 @@ export function MiniApps() {
           <h2>{t('miniApps.title')}</h2>
           <p>{t('miniApps.subtitle')}</p>
         </div>
-        <span className="ep">
-          <b>GET</b> /sellers/me/scripts
-        </span>
       </div>
 
       {!approved && <PendingApproval />}

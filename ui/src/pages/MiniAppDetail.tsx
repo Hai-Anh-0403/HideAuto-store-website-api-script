@@ -145,7 +145,6 @@ export function MiniAppDetail() {
 
       {tab === 'keys' && (
         <DetailKeys
-          scriptId={s.id}
           scriptName={s.name}
           keys={keys.data ?? []}
           loading={keys.loading}
@@ -600,10 +599,7 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
           </table>
         </div>
         <div className="card-foot">
-          <span className="note">
-            {t('versions.foot')}{' '}
-            <span className="mono">POST /sellers/me/scripts/{'{id}'}/versions</span>
-          </span>
+          <span className="note">{t('versions.foot')}</span>
         </div>
       </Card>
     </>
@@ -611,7 +607,6 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
 }
 
 function DetailKeys({
-  scriptId,
   scriptName,
   keys,
   loading,
@@ -619,7 +614,6 @@ function DetailKeys({
   onCreate,
   onRevoke,
 }: {
-  scriptId: string
   scriptName: string
   keys: KeyItem[]
   loading: boolean
@@ -739,10 +733,7 @@ function DetailKeys({
         </div>
       )}
       <div className="card-foot">
-        <span className="note">
-          {t('detailKeys.foot', { name: scriptName })}{' '}
-          <span className="mono">POST /sellers/me/scripts/{scriptId}/keys</span>
-        </span>
+        <span className="note">{t('detailKeys.foot', { name: scriptName })}</span>
       </div>
     </Card>
   )

@@ -41,9 +41,6 @@ export function Overview() {
           <h2>{t('overview.title')}</h2>
           <p>{t('overview.subtitle', { name: seller?.name ?? '' })}</p>
         </div>
-        <span className="ep">
-          <b>GET</b> /sellers/me
-        </span>
       </div>
 
       {!approved && <PendingApproval />}
@@ -77,14 +74,7 @@ export function Overview() {
       </div>
 
       <Card>
-        <CardHead
-          title={t('overview.recent')}
-          actions={
-            <span className="ep">
-              <b>GET</b> /sellers/me/members
-            </span>
-          }
-        />
+        <CardHead title={t('overview.recent')} />
         {members.loading ? (
           <Loading what={t('nav.members').toLowerCase()} />
         ) : (
