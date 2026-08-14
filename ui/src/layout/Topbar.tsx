@@ -36,7 +36,8 @@ export function Topbar({
   const { mode, cycle } = useTheme()
   const { seller, logout } = useAuth()
   const { t, lang, setLang } = useI18n()
-  const status = seller ? sellerStatus[seller.status] : null
+  // Chỉ nhắc khi tài khoản chưa dùng được; đã duyệt là trạng thái bình thường, không cần badge.
+  const status = seller && seller.status !== 'approved' ? sellerStatus[seller.status] : null
   const titleKey = titleKeyFor(pathname)
 
   return (

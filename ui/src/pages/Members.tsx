@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useState } from 'react'
+import { useState } from 'react'
 import { Card, CardHead } from '../ui/Card'
 import { Pill } from '../ui/Pill'
 import { Empty, ErrorState, PendingApproval, TableSkeleton } from '../ui/States'
@@ -9,7 +9,7 @@ import { useErrorText } from '../lib/errors'
 import { fmtWhen, isOnline } from '../lib/pills'
 import { useFetch } from '../lib/useFetch'
 import { useAuth } from '../store/auth'
-import type { Member, MemberUsage, Page, Script } from '../types'
+import type { Member, Page, Script } from '../types'
 
 export function Members() {
   const { seller } = useAuth()
@@ -34,8 +34,6 @@ export function Members() {
   const rows = (members.data?.items ?? []).filter(
     (m) => !needle || (m.user_email ?? '').toLowerCase().includes(needle),
   )
-
-  const [openDevices, setOpenDevices] = useState<string | null>(null)
 
   const toggleBlock = async (m: Member) => {
     const action = m.status === 'blocked' ? 'unblock' : 'block'
@@ -96,71 +94,56 @@ export function Members() {
               </thead>
               <tbody>
                 {rows.map((m) => (
-                  <Fragment key={m.id}>
-                    <tr>
-                      <td>
-                        <div className="u-main">{m.user_name ?? m.user_email ?? m.user_id}</div>
-                        <div className="u-sub">
-                          {m.user_email} · <span className="mono">{m.user_id}</span>
-                        </div>
-                      </td>
-                      <td>
-                        {m.status === 'blocked' ? (
-                          <Pill tone="bad">{t('status.member.blocked')}</Pill>
-                        ) : (
-                          <Pill tone="ok">{t('status.member.active')}</Pill>
-                        )}
-                      </td>
-                      <td className="opt">
-                        <div className="chips">
-                          {m.all_scripts && <Pill tone="accent">{t('members.allApps')}</Pill>}
-                          {m.script_ids.map((id) => (
-                            <Pill key={id} tone="accent">
-                              {nameOf(id)}
-                            </Pill>
-                          ))}
-                        </div>
-                        <div className="u-sub tnum" style={{ marginTop: 4 }}>
-                          {t('members.appCount', {
-                            used: m.all_scripts ? scriptItems.length : m.script_ids.length,
-                            total: scriptItems.length,
-                          })}
-                        </div>
-                      </td>
-                      <td>
-                        {isOnline(m.last_seen_at) ? (
-                          <Pill tone="ok">
-                            <span className="dot on live" /> {t('members.online')}
+                  <tr key={m.id}>
+                    <td>
+                      <div className="u-main">{m.user_name ?? m.user_email ?? m.user_id}</div>
+                      <div className="u-sub">
+                        {m.user_email} · <span className="mono">{m.user_id}</span>
+                      </div>
+                    </td>
+                    <td>
+                      {m.status === 'blocked' ? (
+                        <Pill tone="bad">{t('status.member.blocked')}</Pill>
+                      ) : (
+                        <Pill tone="ok">{t('status.member.active')}</Pill>
+                      )}
+                    </td>
+                    <td className="opt">
+                      <div className="chips">
+                        {m.all_scripts && <Pill tone="accent">{t('members.allApps')}</Pill>}
+                        {m.script_ids.map((id) => (
+                          <Pill key={id} tone="accent">
+                            {nameOf(id)}
                           </Pill>
-                        ) : (
-                          <Pill tone="neutral">
-                            <span className="dot off" /> {fmtWhen(m.last_seen_at, lang, t('time.now'))}
-                          </Pill>
-                        )}
-                      </td>
-                      <td className="rowbtns">
-                        <button
-                          className="btn sm"
-                          onClick={() => setOpenDevices(openDevices === m.id ? null : m.id)}
-                        >
-                          {openDevices === m.id ? t('members.hideDevices') : t('members.showDevices')}
-                        </button>
-                        <button
-                          className={m.status === 'blocked' ? 'btn ok sm' : 'btn bad sm'}
-                          onClick={() => toggleBlock(m)}
-                        >
-                          {m.status === 'blocked' ? t('members.unblock') : t('members.block')}
-                        </button>
-                      </td>
-                    </tr>
-                    {openDevices === m.id && (
-                      <tr>
-                        <td colSpan={5} style={{ background: 'var(--surface-2)', padding: '4px 16px 12px' }}>
-                          <Devices memberId={m.id} />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
+                        ))}
+                      </div>
+                      <div className="u-sub tnum" style={{ marginTop: 4 }}>
+                        {t('members.appCount', {
+                          used: m.all_scripts ? scriptItems.length : m.script_ids.length,
+                          total: scriptItems.length,
+                        })}
+                      </div>
+                    </td>
+                    <td>
+                      {isOnline(m.last_seen_at) ? (
+                        <Pill tone="ok">
+                          <span className="dot on live" /> {t('members.online')}
+                        </Pill>
+                      ) : (
+                        <Pill tone="neutral">
+                          <span className="dot off" /> {fmtWhen(m.last_seen_at, lang, t('time.now'))}
+                        </Pill>
+                      )}
+                    </td>
+                    <td className="rowbtns">
+                      <button
+                        className={m.status === 'blocked' ? 'btn ok sm' : 'btn bad sm'}
+                        onClick={() => toggleBlock(m)}
+                      >
+                        {m.status === 'blocked' ? t('members.unblock') : t('members.block')}
+                      </button>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -171,58 +154,5 @@ export function Members() {
         </div>
       </Card>
     </>
-  )
-}
-
-/** Máy nào user đang chạy — chặn được từng máy thay vì khoá cả tài khoản. */
-function Devices({ memberId }: { memberId: string }) {
-  const { t, lang } = useI18n()
-  const { toast } = useToast()
-  const errorText = useErrorText()
-
-  const load = useCallback(
-    () => api.get<MemberUsage>(`/sellers/me/members/${memberId}/usage`),
-    [memberId],
-  )
-  const usage = useFetch(load, `usage:${memberId}`)
-
-  const setBlocked = async (machineId: string, blocked: boolean) => {
-    try {
-      await api.post(`/sellers/me/members/${memberId}/devices/${machineId}/${blocked ? 'block' : 'unblock'}`)
-      usage.reload()
-      toast(
-        blocked
-          ? t('members.deviceBlocked', { id: machineId })
-          : t('members.deviceUnblocked', { id: machineId }),
-      )
-    } catch (err) {
-      toast(errorText(err))
-    }
-  }
-
-  if (usage.loading) return <TableSkeleton rows={2} />
-  if (usage.error) return <ErrorState message={usage.error} />
-  if (!usage.data?.devices.length) return <div className="state">{t('members.noDevices')}</div>
-
-  return (
-    <div style={{ paddingTop: 8 }}>
-      {usage.data.devices.map((d) => (
-        <div key={d.machine_id} className="kv">
-          <span className="klab">{d.os ?? t('members.devices')}</span>
-          <span className="mono">{d.machine_id}</span>
-          <span className="u-sub">
-            {t('members.lastSeen')}: {fmtWhen(d.last_seen_at, lang, t('time.now'))}
-          </span>
-          {d.blocked && <Pill tone="bad">{t('members.deviceBlockedTag')}</Pill>}
-          <div className="sp" />
-          <button
-            className={d.blocked ? 'btn ok sm' : 'btn bad sm'}
-            onClick={() => setBlocked(d.machine_id, !d.blocked)}
-          >
-            {d.blocked ? t('members.unblockDevice') : t('members.blockDevice')}
-          </button>
-        </div>
-      ))}
-    </div>
   )
 }
