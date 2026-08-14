@@ -30,9 +30,7 @@ async def list_members(
     )
 
 
-async def list_users(
-    *, q: str | None, skip: int, limit: int
-) -> tuple[list[dict[str, Any]], int]:
+async def list_users(*, q: str | None, skip: int, limit: int) -> tuple[list[dict[str, Any]], int]:
     return await member_repo.distinct_users(q=q, skip=skip, limit=limit)
 
 

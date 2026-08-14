@@ -1,0 +1,60 @@
+# Cả project trong 1 lệnh:
+#
+#   docker compose up -d --build     # chạy tất cả (Mongo + API + UI)
+#   docker compose logs -f api       # xem log
+#   docker compose stop              # tắt, giữ dữ liệu
+#   docker compose down -v           # xoá sạch cả dữ liệu
+#
+# UI: http://localhost:5173 · API/Swagger: http://localhost:8000/docs
+# Muốn hot reload khi code thì chạy native (xem README) — compose dùng bản build sẵn.
+name: store-hideflow
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: sah-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api:
+    build: ./api
+    container_name: sah-api
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # Secrets/admin seed đọc từ api/.env; các giá trị dưới đây ghi đè cho môi trường container.
+    env_file:
+      - ./api/.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      STORAGE_DIR: /data/storage
+      MINI_APP_TEMPLATE_PATH: /data/mini-app-template.zip
+    ports:
+      - "8000:8000"
+    volumes:
+      # api/var dùng chung với lúc chạy native: graph đã scrub nằm ở var/storage,
+      # template mini-app rỗng (tuỳ chọn) là var/mini-app-template.zip.
+      - ./api/var:/data
+
+  ui:
+    build: ./ui
+    container_name: sah-ui
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+
+volumes:
+  mongo-data:
+    name: sah-mongo-data
