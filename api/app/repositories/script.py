@@ -20,6 +20,10 @@ async def get_by_slug(slug: str) -> Script | None:
     return await Script.find_one(Script.slug == slug)
 
 
+async def get_by_seller_and_name(seller_id: PydanticObjectId, name: str) -> Script | None:
+    return await Script.find_one({"seller.id": seller_id, "name": name})
+
+
 async def list_for_seller(
     seller_id: PydanticObjectId,
     *,
