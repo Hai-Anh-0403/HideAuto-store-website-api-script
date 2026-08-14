@@ -45,6 +45,14 @@ class ScriptCreate(BaseModel):
     tested_app_version: str | None = Field(default=None, pattern=SEMVER_PATTERN)
 
 
+class ScriptUpdate(BaseModel):
+    """Listing text the seller can fix after publishing. Everything else is derived."""
+
+    name: str | None = Field(default=None, min_length=3, max_length=120)
+    short_description: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=20_000)
+
+
 class ScriptVersionCreate(BaseModel):
     version: str = Field(pattern=SEMVER_PATTERN)
     changelog: str | None = Field(default=None, max_length=2_000)

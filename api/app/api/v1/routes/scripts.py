@@ -19,6 +19,7 @@ from app.schemas.script import (
     ScriptDetailRead,
     ScriptInspect,
     ScriptRead,
+    ScriptUpdate,
     ScriptVersionCreate,
     ScriptVersionRead,
     VersionReject,
@@ -158,9 +159,37 @@ async def add_version(
     return ScriptVersionRead.model_validate(created)
 
 
+@router.patch(
+    "/sellers/me/scripts/{script_id}",
+    response_model=ScriptRead,
+    summary="Edit the listing text (slug and derived metadata stay put)",
+)
+async def update_script(
+    script_id: PydanticObjectId, seller: ApprovedSeller, payload: ScriptUpdate
+) -> ScriptRead:
+    script = await script_service.update_script(seller, script_id, payload)
+    return ScriptRead.model_validate(script)
+
+
 @router.post("/sellers/me/scripts/{script_id}/submit", response_model=ScriptRead)
 async def submit_for_review(script_id: PydanticObjectId, seller: ApprovedSeller) -> ScriptRead:
     script = await script_service.submit_for_review(seller, script_id)
+    return ScriptRead.model_validate(script)
+
+
+@router.post(
+    "/sellers/me/scripts/{script_id}/archive",
+    response_model=ScriptRead,
+    summary="Take the listing off the store",
+)
+async def archive_script(script_id: PydanticObjectId, seller: ApprovedSeller) -> ScriptRead:
+    script = await script_service.set_archived(seller, script_id, True)
+    return ScriptRead.model_validate(script)
+
+
+@router.post("/sellers/me/scripts/{script_id}/unarchive", response_model=ScriptRead)
+async def unarchive_script(script_id: PydanticObjectId, seller: ApprovedSeller) -> ScriptRead:
+    script = await script_service.set_archived(seller, script_id, False)
     return ScriptRead.model_validate(script)
 
 

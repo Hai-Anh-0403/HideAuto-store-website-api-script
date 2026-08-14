@@ -19,6 +19,7 @@ from tests.helpers import (
     auth,
     graph,
     mini_app_zip,
+    publish_script,
     upload_files,
 )
 
@@ -224,6 +225,44 @@ async def test_rejected_version_keeps_the_published_one(client: httpx.AsyncClien
         headers=auth(admin),
     )
     assert r.status_code == 409, r.text
+
+
+async def test_edit_listing_and_archive(client: httpx.AsyncClient) -> None:
+    """A seller can fix the listing text and pull the app off the store."""
+    admin = await admin_token(client)
+    seller = await approved_seller_token(client, admin)
+    script_id = await publish_script(client, seller, admin)
+
+    r = await client.patch(
+        f"/api/v1/sellers/me/scripts/{script_id}",
+        json={"name": "Gmail Auto Register Pro", "short_description": "Tạo Gmail hàng loạt."},
+        headers=auth(seller),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "Gmail Auto Register Pro"
+    assert r.json()["short_description"] == "Tạo Gmail hàng loạt."
+    # The slug is the public URL — renaming must not move it.
+    assert r.json()["slug"] == "gmail-auto-register"
+    assert r.json()["status"] == "published"
+
+    r = await client.post(f"/api/v1/sellers/me/scripts/{script_id}/archive", headers=auth(seller))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "archived"
+
+    r = await client.post(f"/api/v1/sellers/me/scripts/{script_id}/archive", headers=auth(seller))
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "already_archived"
+
+    # Restoring goes back to published because an approved version is still live.
+    r = await client.post(f"/api/v1/sellers/me/scripts/{script_id}/unarchive", headers=auth(seller))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "published"
+
+    other = await approved_seller_token(client, admin, email="other@teststore.com")
+    r = await client.patch(
+        f"/api/v1/sellers/me/scripts/{script_id}", json={"name": "Hijacked"}, headers=auth(other)
+    )
+    assert r.status_code == 403, r.text
 
 
 async def test_upload_rejections_and_ownership(client: httpx.AsyncClient) -> None:

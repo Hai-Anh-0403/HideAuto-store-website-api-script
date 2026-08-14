@@ -29,7 +29,7 @@ from app.models.script_version import ScriptVersion
 from app.models.seller import Seller
 from app.repositories import script as script_repo
 from app.repositories import script_version as version_repo
-from app.schemas.script import ScriptCreate, ScriptInspect, ScriptVersionCreate
+from app.schemas.script import ScriptCreate, ScriptInspect, ScriptUpdate, ScriptVersionCreate
 from app.services import upload_service
 from app.utils.ids import require_id, slugify
 from app.utils.mini_app_package import ExtractedPackage, extract_package
@@ -246,6 +246,44 @@ async def add_version(
     script.updated_at = datetime.now(UTC)
     await script.save()
     return version
+
+
+async def update_script(seller: Seller, script_id: PydanticObjectId, data: ScriptUpdate) -> Script:
+    """Edit the listing text. The slug stays fixed — it is the public URL of the app."""
+    script = await _owned_script(require_id(seller.id), script_id)
+    changes = data.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        setattr(script, field, value)
+    if changes:
+        script.updated_at = datetime.now(UTC)
+        await script.save()
+    return script
+
+
+async def set_archived(seller: Seller, script_id: PydanticObjectId, archived: bool) -> Script:
+    """Take a listing off the store, or put it back where it was.
+
+    Restoring returns to `published` only if an approved version is still pointed at;
+    otherwise it lands back in `draft` so it has to go through review again.
+    """
+    script = await _owned_script(require_id(seller.id), script_id)
+    if archived:
+        if script.status == ScriptStatus.ARCHIVED:
+            raise ConflictError("Script is already archived", code="already_archived")
+        script.status = ScriptStatus.ARCHIVED
+    else:
+        if script.status != ScriptStatus.ARCHIVED:
+            raise ConflictError("Script is not archived", code="not_archived")
+        approved = await _approved_version(require_id(script.id))
+        script.status = ScriptStatus.PUBLISHED if approved else ScriptStatus.DRAFT
+    script.updated_at = datetime.now(UTC)
+    await script.save()
+    return script
+
+
+async def _approved_version(script_id: PydanticObjectId) -> ScriptVersion | None:
+    versions = await version_repo.list_for_script(script_id)
+    return next((v for v in versions if v.status == ScriptVersionStatus.APPROVED), None)
 
 
 async def submit_for_review(seller: Seller, script_id: PydanticObjectId) -> Script:
