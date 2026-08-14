@@ -1,0 +1,76 @@
+/* Design tokens — theme-aware. No rgb()/rgba(): colors are hex (8-digit for alpha)
+   or color-mix(). Bare :root = light; dark via prefers-color-scheme + [data-theme]. */
+:root {
+  --ground: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #fbfcfd;
+  --ink: #151a23;
+  --muted: #616b7a;
+  --faint: #8b95a4;
+  --border: #e5e8ee;
+  --border-strong: #d3d8e2;
+  --accent: #2f62ef;
+  --accent-ink: #ffffff;
+  --accent-soft: #e9eeff;
+  --ok: #15883e;
+  --ok-soft: #e2f4e8;
+  --warn: #b8710a;
+  --warn-soft: #fbeed5;
+  --bad: #cf2b3a;
+  --bad-soft: #fbe4e6;
+  --neutral: #5c6675;
+  --neutral-soft: #eceff3;
+  --shadow: 0 1px 2px #141a230d, 0 8px 24px -12px #141a2324;
+  --radius: 11px;
+  --radius-sm: 8px;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0c0e13;
+    --surface: #141821;
+    --surface-2: #181d28;
+    --ink: #e8ebf1;
+    --muted: #98a2b3;
+    --faint: #6b7686;
+    --border: #232936;
+    --border-strong: #2f3746;
+    --accent: #5b86f6;
+    --accent-ink: #0b0e14;
+    --accent-soft: #1a2338;
+    --ok: #41c46f;
+    --ok-soft: #12281a;
+    --warn: #e0a13c;
+    --warn-soft: #2a2110;
+    --bad: #f16b77;
+    --bad-soft: #2c1417;
+    --neutral: #8a94a5;
+    --neutral-soft: #1c2230;
+    --shadow: 0 1px 2px #0000004d, 0 10px 28px -14px #00000099;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #0c0e13;
+  --surface: #141821;
+  --surface-2: #181d28;
+  --ink: #e8ebf1;
+  --muted: #98a2b3;
+  --faint: #6b7686;
+  --border: #232936;
+  --border-strong: #2f3746;
+  --accent: #5b86f6;
+  --accent-ink: #0b0e14;
+  --accent-soft: #1a2338;
+  --ok: #41c46f;
+  --ok-soft: #12281a;
+  --warn: #e0a13c;
+  --warn-soft: #2a2110;
+  --bad: #f16b77;
+  --bad-soft: #2c1417;
+  --neutral: #8a94a5;
+  --neutral-soft: #1c2230;
+  --shadow: 0 1px 2px #0000004d, 0 10px 28px -14px #00000099;
+}
