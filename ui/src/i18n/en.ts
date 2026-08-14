@@ -125,11 +125,10 @@ export const en: Record<keyof typeof vi, string> = {
   'detail.tab.packaging': 'Package .zip',
   'detail.notFound': 'Mini app not found',
 
-  'detail.caps.title': 'Capabilities & requirements',
+  'detail.caps.title': 'Technical details',
   'detail.caps.downloadGraph': '⬇ Graph',
   'detail.caps.node': 'Nodes',
   'detail.caps.nodeValue': '{count} nodes · {groups}',
-  'detail.caps.needs': 'Requires',
   'detail.caps.vars': 'Variables to fill',
   'detail.caps.compat': 'Compatibility',
   'detail.caps.compatValue': 'hideflow ≥',

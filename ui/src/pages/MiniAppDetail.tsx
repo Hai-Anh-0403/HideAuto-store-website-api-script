@@ -229,10 +229,6 @@ function DetailOverview({
             <GroupChips groups={s.node_groups_used} />
           </div>
           <div className="kv">
-            <span className="klab">{t('detail.caps.needs')}</span>
-            <CapsChips caps={s.capabilities} />
-          </div>
-          <div className="kv">
             <span className="klab">{t('detail.caps.vars')}</span>{' '}
             {latest?.required_variables.length ? (
               latest.required_variables.map((v) => (

@@ -122,11 +122,10 @@ export const vi = {
   'detail.tab.packaging': 'Đóng gói .zip',
   'detail.notFound': 'Không tìm thấy mini app',
 
-  'detail.caps.title': 'Khả năng & yêu cầu',
+  'detail.caps.title': 'Thông tin kỹ thuật',
   'detail.caps.downloadGraph': '⬇ Graph',
   'detail.caps.node': 'Node',
   'detail.caps.nodeValue': '{count} node · {groups}',
-  'detail.caps.needs': 'Yêu cầu',
   'detail.caps.vars': 'Biến cần điền',
   'detail.caps.compat': 'Tương thích',
   'detail.caps.compatValue': 'hideflow ≥',
