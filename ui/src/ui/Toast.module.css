@@ -1,27 +1,28 @@
 .wrap {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  right: 16px;
+  bottom: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 50;
 }
 .toast {
-  background: var(--ink);
-  color: var(--ground);
-  font-size: 13px;
+  background: var(--surface-3);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  font-size: 12.5px;
   font-weight: 500;
   padding: 10px 14px;
-  border-radius: 9px;
-  box-shadow: var(--shadow);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
   display: flex;
   align-items: center;
   gap: 8px;
-  animation: slidein 0.28s ease;
+  animation: slidein var(--dur-base) var(--ease-out);
 }
 .tick {
-  color: var(--ok);
+  color: var(--success);
 }
 @keyframes slidein {
   from { opacity: 0; transform: translateY(8px); }
