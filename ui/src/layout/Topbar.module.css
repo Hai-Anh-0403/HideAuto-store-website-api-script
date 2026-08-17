@@ -22,7 +22,10 @@
   border-radius: 999px;
   background: var(--surface-2);
   font-size: 12.5px;
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-out);
 }
+.who:hover { background: var(--surface-3); }
 .av {
   width: 22px;
   height: 22px;
@@ -76,6 +79,7 @@
   .statusPill { display: none; }
   .whoName { display: none; }
   .who { padding: 4px; border: 0; background: transparent; }
-  .logout { display: none; }
-  .logoutIcon { display: grid; }
+  /* Kèm `.top` cho đủ đặc hiệu: `.btn` của global.css nạp sau module này. */
+  .top .logout { display: none; }
+  .top .logoutIcon { display: grid; }
 }

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { BrandLogo } from '../ui/Brand'
 import { Card } from '../ui/Card'
 import { useI18n } from '../i18n'
 import { useErrorText } from '../lib/errors'
@@ -50,6 +51,7 @@ export function Login() {
     <div className="login">
       <div className="login-box">
         <div className="login-brand">
+          <BrandLogo size={56} detail />
           <b>storeAutoHide</b>
           <span>{t('login.tagline')}</span>
         </div>

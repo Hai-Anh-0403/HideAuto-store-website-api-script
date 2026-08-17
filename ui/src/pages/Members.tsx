@@ -40,7 +40,7 @@ export function Members() {
     try {
       await api.post(`/sellers/me/members/${m.id}/${action}`)
       members.reload()
-      const email = m.user_email ?? m.user_id
+      const email = m.user_email ?? m.user_name ?? t('common.dash')
       toast(action === 'block' ? t('members.blocked', { email }) : t('members.unblocked', { email }))
     } catch (err) {
       toast(errorText(err))
@@ -96,10 +96,10 @@ export function Members() {
                 {rows.map((m) => (
                   <tr key={m.id}>
                     <td>
-                      <div className="u-main">{m.user_name ?? m.user_email ?? m.user_id}</div>
-                      <div className="u-sub">
-                        {m.user_email} · <span className="mono">{m.user_id}</span>
+                      <div className="u-main">
+                        {m.user_name ?? m.user_email ?? t('common.dash')}
                       </div>
+                      <div className="u-sub">{m.user_email}</div>
                     </td>
                     <td>
                       {m.status === 'blocked' ? (

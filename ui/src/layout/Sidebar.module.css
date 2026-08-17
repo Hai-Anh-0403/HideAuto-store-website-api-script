@@ -15,18 +15,7 @@
   gap: 10px;
   padding: 6px 8px 16px;
 }
-.logo {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-md);
-  background: var(--brand);
-  display: grid;
-  place-items: center;
-  color: var(--on-brand);
-  font-weight: 600;
-  font-size: 14px;
-  flex: none;
-}
+.brand > svg { flex: none; }
 .brand b { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
 .brand span { display: block; font-size: 11px; color: var(--text-muted); }
 .navlabel {
@@ -57,13 +46,6 @@
 .nav:hover { background: var(--surface-2); color: var(--text-primary); }
 .active { background: var(--brand-tint); color: var(--brand); }
 .ic { width: 16px; font-size: 14px; flex: none; }
-.foot {
-  margin-top: auto;
-  padding: 10px 8px;
-  border-top: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 11px;
-}
 
 /* Drawer trượt trên màn hẹp — mặc định nằm ngoài màn hình, mở bằng nút ☰ ở topbar. */
 @media (max-width: 900px) {

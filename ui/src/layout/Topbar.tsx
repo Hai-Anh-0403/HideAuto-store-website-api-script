@@ -1,4 +1,4 @@
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Pill } from '../ui/Pill'
 import { useI18n, type MessageKey } from '../i18n'
 import { sellerStatus } from '../lib/pills'
@@ -12,6 +12,7 @@ function titleKeyFor(pathname: string): MessageKey | null {
   if (pathname.startsWith('/mini-apps')) return 'nav.miniApps'
   if (pathname.startsWith('/keys')) return 'nav.keys'
   if (pathname.startsWith('/members')) return 'nav.members'
+  if (pathname.startsWith('/profile')) return 'nav.profile'
   return null
 }
 
@@ -63,10 +64,10 @@ export function Topbar({
           <Pill tone={status.tone}>{t(status.key)}</Pill>
         </span>
       )}
-      <div className={styles.who}>
+      <Link to="/profile" className={styles.who} title={t('topbar.profile')}>
         <span className={styles.av}>{initials(seller?.name ?? '?')}</span>
         <span className={styles.whoName}>{seller?.name}</span>
-      </div>
+      </Link>
       <button
         className={styles.icobtn}
         onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
@@ -86,7 +87,7 @@ export function Topbar({
         aria-label={t('topbar.logout')}
         title={t('topbar.logout')}
       >
-        ⏻
+        →
       </button>
     </header>
   )

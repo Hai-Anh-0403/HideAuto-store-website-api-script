@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardHead } from '../ui/Card'
 import { CapsChips } from '../ui/CapsChips'
@@ -12,7 +12,7 @@ import { useErrorText } from '../lib/errors'
 import { fmtCount, scriptStatus } from '../lib/pills'
 import { useFetch } from '../lib/useFetch'
 import { useAuth } from '../store/auth'
-import type { Page, Script, ScriptInspect } from '../types'
+import type { Page, Script, ScriptDetail, ScriptVersion } from '../types'
 
 export function MiniApps() {
   const { seller } = useAuth()
@@ -42,6 +42,7 @@ export function MiniApps() {
       {showUpload && (
         <UploadForm
           onClose={() => setShowUpload(false)}
+          onChanged={() => scripts.reload()}
           onDone={(script) => {
             setShowUpload(false)
             scripts.reload()
@@ -130,56 +131,153 @@ export function MiniApps() {
   )
 }
 
-function UploadForm({ onClose, onDone }: { onClose: () => void; onDone: (script: Script) => void }) {
+const DRAFT_KEY = 'storeautohide.upload-draft'
+
+/** Phần chữ đang gõ dở — nhớ ở máy để đóng form hoặc F5 xong mở lại vẫn còn. */
+interface SavedDraft {
+  id: string
+  name: string
+  shortDescription: string
+}
+
+function readSavedDraft(): SavedDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    return raw ? (JSON.parse(raw) as SavedDraft) : null
+  } catch {
+    return null
+  }
+}
+
+/** Chọn file là gói được tải lên ngay ở dạng nháp; điền nốt thông tin rồi mới đăng. */
+function UploadForm({
+  onClose,
+  onChanged,
+  onDone,
+}: {
+  onClose: () => void
+  onChanged: () => void
+  onDone: (script: Script) => void
+}) {
   const { toast } = useToast()
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<ScriptInspect | null>(null)
-  const [inspecting, setInspecting] = useState(false)
+  const [draft, setDraft] = useState<ScriptDetail | null>(null)
   const [name, setName] = useState('')
   const [version, setVersion] = useState('1.0.0')
   const [minApp, setMinApp] = useState('')
   const [shortDescription, setShortDescription] = useState('')
+  const [uploading, setUploading] = useState(false)
   const [busy, setBusy] = useState(false)
   // Giữ nguyên lỗi gốc rồi mới dịch lúc render — đổi ngôn ngữ là chữ đổi theo.
   const [error, setError] = useState<unknown>(null)
 
-  /** Chọn file xong là hỏi server luôn: gói này có gì, còn secret không. */
+  // Mở lại form thì nhặt nháp cũ về: id nằm ở localStorage, nội dung lấy từ server.
+  useEffect(() => {
+    const saved = readSavedDraft()
+    if (!saved) return
+    setName(saved.name)
+    setShortDescription(saved.shortDescription)
+    api
+      .get<ScriptDetail>(`/sellers/me/scripts/${saved.id}`)
+      .then((detail) => {
+        // Đã đăng hoặc đã xử lý ở chỗ khác thì thôi, không coi là nháp nữa.
+        if (detail.status !== 'draft') {
+          localStorage.removeItem(DRAFT_KEY)
+          return
+        }
+        setDraft(detail)
+        setVersion(detail.latest_version ?? '1.0.0')
+        setMinApp(detail.min_app_version ?? '')
+      })
+      // Nháp đã bị xoá ở chỗ khác thì quên nó đi.
+      .catch(() => localStorage.removeItem(DRAFT_KEY))
+  }, [])
+
+  useEffect(() => {
+    if (!draft) return
+    const saved: SavedDraft = { id: draft.id, name, shortDescription }
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(saved))
+  }, [draft, name, shortDescription])
+
+  const forget = () => localStorage.removeItem(DRAFT_KEY)
+  const latest = draft?.versions[0]
+
+  /** Chọn file xong là tải luôn lên dạng nháp — thoát ra vẫn còn trong danh sách. */
   const pick = async (picked: File | null) => {
-    setFile(picked)
-    setPreview(null)
-    setError(null)
     if (!picked) return
-    setInspecting(true)
+    setError(null)
+    setUploading(true)
     const form = new FormData()
     form.append('file', picked)
+    form.append('version', version)
+    form.append('publish', 'false')
+    if (minApp) form.append('min_app_version', minApp)
     try {
-      const info = await api.upload<ScriptInspect>('/sellers/me/scripts/inspect', form)
-      setPreview(info)
-      if (!name) setName(info.suggested_name)
+      const created = await api.upload<Script>('/sellers/me/scripts', form)
+      setDraft(await api.get<ScriptDetail>(`/sellers/me/scripts/${created.id}`))
+      setName((current) => current || created.name)
+      onChanged()
+      toast(t('upload.draftSaved'))
     } catch (err) {
       setError(err)
     } finally {
-      setInspecting(false)
+      setUploading(false)
     }
   }
 
-  const submit = async (e: FormEvent) => {
+  const saveText = (id: string) =>
+    api.patch<Script>(`/sellers/me/scripts/${id}`, {
+      name,
+      short_description: shortDescription || null,
+    })
+
+  const publish = async (e: FormEvent) => {
     e.preventDefault()
-    if (!file) return
+    if (!draft) return
     setBusy(true)
     setError(null)
-    const form = new FormData()
-    form.append('file', file)
-    if (name) form.append('name', name)
-    form.append('version', version)
-    if (minApp) form.append('min_app_version', minApp)
-    if (shortDescription) form.append('short_description', shortDescription)
     try {
-      const script = await api.upload<Script>('/sellers/me/scripts', form)
+      await saveText(draft.id)
+      const script = await api.post<Script>(`/sellers/me/scripts/${draft.id}/publish`)
+      forget()
       toast(t('upload.done', { name: script.name }))
       onDone(script)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const keepDraft = async () => {
+    if (!draft) return
+    setBusy(true)
+    setError(null)
+    try {
+      await saveText(draft.id)
+      onChanged()
+      toast(t('upload.draftSaved'))
+      onClose()
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const discard = async () => {
+    if (!draft) return
+    // Hành động phá hủy: hỏi lại, gói vừa tải lên sẽ mất.
+    if (!window.confirm(t('upload.discardConfirm'))) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api.del(`/sellers/me/scripts/${draft.id}`)
+      forget()
+      onChanged()
+      toast(t('upload.discarded'))
+      onClose()
     } catch (err) {
       setError(err)
     } finally {
@@ -197,25 +295,26 @@ function UploadForm({ onClose, onDone }: { onClose: () => void; onDone: (script:
           </button>
         }
       />
-      <form onSubmit={submit} style={{ padding: 16 }}>
-        <label className="dropzone" style={{ display: 'block', cursor: 'pointer', marginBottom: 14 }}>
-          <input
-            type="file"
-            accept=".zip,.exe,.json,.workflow"
-            className="hide"
-            onChange={(e) => void pick(e.target.files?.[0] ?? null)}
-          />
-          {file ? (
-            <>
-              ✓ <b>{file.name}</b> · {(file.size / 1024).toFixed(0)} KB
-            </>
-          ) : (
-            t('upload.pick', { zip: '.zip/.exe', json: 'app.workflow / .json' })
-          )}
-        </label>
+      <form onSubmit={publish} style={{ padding: 16 }}>
+        {draft ? (
+          <div className="dropzone" style={{ marginBottom: 14 }}>
+            ✓ <b>{latest?.source_filename ?? draft.name}</b> · {t('upload.draftChip')}
+          </div>
+        ) : (
+          <label className="dropzone" style={{ display: 'block', cursor: 'pointer', marginBottom: 14 }}>
+            <input
+              type="file"
+              accept=".zip,.exe,.json,.workflow"
+              className="hide"
+              disabled={uploading}
+              onChange={(e) => void pick(e.target.files?.[0] ?? null)}
+            />
+            {t('upload.pick', { zip: '.zip/.exe', json: 'app.workflow / .json' })}
+          </label>
+        )}
 
-        {inspecting && <div className="state">{t('upload.inspecting')}</div>}
-        {preview && <Preview info={preview} />}
+        {uploading && <div className="state">{t('upload.inspecting')}</div>}
+        {latest && <Preview version={latest} fallbackName={draft?.name ?? ''} />}
         {error != null && <ErrorState message={errorText(error, 'upload.failed')} />}
 
         <div className="grid2">
@@ -226,7 +325,8 @@ function UploadForm({ onClose, onDone }: { onClose: () => void; onDone: (script:
               value={name}
               onChange={(e) => setName(e.target.value)}
               minLength={3}
-              placeholder={preview?.suggested_name ?? t('upload.namePlaceholder')}
+              required={draft != null}
+              placeholder={t('upload.namePlaceholder')}
             />
           </label>
           <label className="field">
@@ -236,6 +336,7 @@ function UploadForm({ onClose, onDone }: { onClose: () => void; onDone: (script:
               value={version}
               onChange={(e) => setVersion(e.target.value)}
               pattern="\d+\.\d+\.\d+"
+              disabled={draft != null}
               required
             />
           </label>
@@ -246,6 +347,7 @@ function UploadForm({ onClose, onDone }: { onClose: () => void; onDone: (script:
               value={minApp}
               onChange={(e) => setMinApp(e.target.value)}
               pattern="\d+\.\d+\.\d+"
+              disabled={draft != null}
               placeholder="1.4.0"
             />
           </label>
@@ -260,36 +362,53 @@ function UploadForm({ onClose, onDone }: { onClose: () => void; onDone: (script:
           </label>
         </div>
 
-        <button className="btn pri" type="submit" disabled={busy || !file || inspecting}>
-          {busy ? t('upload.submitting') : t('upload.submit')}
-        </button>
-        <span className="note" style={{ marginLeft: 10 }}>
-          {t('upload.note')}
-        </span>
+        <div className="formrow">
+          <button className="btn pri" type="submit" disabled={busy || !draft}>
+            {busy ? t('upload.publishing') : t('upload.publish')}
+          </button>
+          <button className="btn" type="button" disabled={busy || !draft} onClick={() => void keepDraft()}>
+            {t('upload.saveDraft')}
+          </button>
+          <button className="btn bad" type="button" disabled={busy || !draft} onClick={() => void discard()}>
+            {t('upload.discard')}
+          </button>
+          <span className="note">{draft ? t('upload.versionLocked') : t('upload.draftNote')}</span>
+        </div>
       </form>
     </Card>
   )
 }
 
-/** Những gì store đọc được từ gói vừa chọn — hiện trước khi seller bấm tải lên. */
-function Preview({ info }: { info: ScriptInspect }) {
+/** Những gì store đọc được từ gói vừa tải lên. */
+function Preview({ version, fallbackName }: { version: ScriptVersion; fallbackName: string }) {
   const { t } = useI18n()
-  const creds = info.scan.embedded_credentials_count
+  const creds = version.scan.embedded_credentials_count
+  const appName = version.app_name ?? fallbackName
+
+  // Gói .exe đóng kín: chưa mở được graph nên không có gì để khoe, chỉ báo đúng sự thật.
+  if (!version.graph_extracted) {
+    return (
+      <div className="banner warn">
+        <span className="bi">📦</span>
+        <div>
+          <b>{t('preview.opaqueTitle', { name: appName })}</b>
+          {t('preview.opaqueBody')}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className={creds ? 'banner bad' : 'banner ok'}>
         <span className="bi">{creds ? '🔑' : '🔎'}</span>
         <div>
-          <b>
-            {info.app_name
-              ? t('preview.extracted', { name: info.app_name, count: info.node_count })
-              : t('preview.extractedAnon', { count: info.node_count })}
-          </b>
+          <b>{t('preview.extracted', { name: appName, count: version.node_count })}</b>
           {creds ? (
             <>
               {t('preview.credentials', { count: creds })}
               <div className="chips" style={{ marginTop: 6 }}>
-                {info.scan.credential_paths.map((p) => (
+                {version.scan.credential_paths.map((p) => (
                   <span key={p} className="keychip">
                     🔑 {p}
                   </span>
@@ -298,19 +417,19 @@ function Preview({ info }: { info: ScriptInspect }) {
             </>
           ) : (
             t('preview.clean', {
-              groups: info.node_groups_used.join(', ') || t('preview.noNodes'),
+              groups: version.node_groups_used.join(', ') || t('preview.noNodes'),
             })
           )}
         </div>
       </div>
       <div className="kv">
         <span className="klab">{t('preview.needs')}</span>
-        <CapsChips caps={info.capabilities} />
+        <CapsChips caps={version.capabilities} />
       </div>
       <div className="kv" style={{ marginBottom: 14 }}>
         <span className="klab">{t('detail.caps.node')}</span>
-        <b className="tnum">{info.node_count}</b>
-        <GroupChips groups={info.node_groups_used} />
+        <b className="tnum">{version.node_count}</b>
+        <GroupChips groups={version.node_groups_used} />
       </div>
     </>
   )

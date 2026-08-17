@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ApiError, api, getToken, setToken } from '../lib/api'
+import { ApiError, api, getToken, setToken, setUnauthorizedHandler } from '../lib/api'
 import type { Seller, Token } from '../types'
 
 interface AuthValue {
@@ -53,8 +53,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(() => {
+    // Kết thúc phiên ở server để thiết bị này biến mất khỏi danh sách; token đã nằm
+    // trong request rồi nên xoá ngay sau đó vẫn an toàn.
+    void api.post('/sellers/logout').catch(() => {})
     setToken(null)
     setSeller(null)
+  }, [])
+
+  // Token chết giữa chừng (hết hạn, hoặc bị đăng xuất từ máy khác) thì về màn đăng nhập.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setToken(null)
+      setSeller(null)
+    })
+    return () => setUnauthorizedHandler(null)
   }, [])
 
   const refresh = useCallback(() => setNonce((n) => n + 1), [])

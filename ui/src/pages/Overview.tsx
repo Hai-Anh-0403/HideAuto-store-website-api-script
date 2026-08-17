@@ -93,7 +93,7 @@ export function Overview() {
                   memberItems.slice(0, 8).map((m) => (
                     <tr key={m.id}>
                       <td>
-                        <div className="u-main">{m.user_name ?? m.user_email ?? m.user_id}</div>
+                        <div className="u-main">{m.user_name ?? m.user_email ?? t('common.dash')}</div>
                         <div className="u-sub">{m.user_email}</div>
                       </td>
                       <td>

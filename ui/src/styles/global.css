@@ -40,6 +40,8 @@ input { font-family: inherit; }
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  /* Nút cao cố định: nhãn hai chữ ("Bỏ chặn") mà xuống dòng là chữ tràn ra ngoài viền. */
+  white-space: nowrap;
   transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .btn:hover { background: var(--surface-3); }
@@ -53,7 +55,9 @@ input { font-family: inherit; }
 .btn.sm { height: 28px; padding: 0 9px; font-size: 12px; }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn:disabled:hover { background: transparent; }
-.rowbtns { display: flex; gap: 6px; justify-content: flex-end; }
+/* Cột hành động: co theo đúng bề rộng nút, phần thừa nhường cho các cột nội dung. */
+.rowbtns { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+.rowbtns .btn { flex: none; }
 
 /* Cards — bề mặt lớp 1, viền tóc, không bóng nặng */
 .card {
@@ -224,6 +228,7 @@ textarea.input { height: auto; min-height: 84px; padding: 8px 10px; line-height:
 .login { min-height: 100%; display: grid; place-items: center; padding: 32px 16px; }
 .login-box { width: min(400px, 100%); }
 .login-brand { text-align: center; margin-bottom: 16px; }
+.login-brand svg { display: block; margin: 0 auto 10px; }
 .login-brand b { font-size: 17px; font-weight: 600; }
 .login-brand span { display: block; color: var(--text-muted); font-size: 12.5px; }
 
@@ -251,6 +256,10 @@ textarea.input { height: auto; min-height: 84px; padding: 8px 10px; line-height:
   .card-h, .card-foot { padding: 12px 14px; }
   th, td { padding-left: 14px; padding-right: 14px; }
   .btn { padding: 0 10px; }
+  /* Ngón tay to hơn con trỏ: nút trong hàng cao thêm, và cột hành động bớt lề trái
+     để phần chỗ đó trả lại cho chính cái nút. */
+  .btn.sm { height: 32px; padding: 0 11px; }
+  td.rowbtns { padding-left: 8px; }
   .empty { padding: 24px 14px; }
 }
 

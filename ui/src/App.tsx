@@ -7,6 +7,7 @@ import { Members } from './pages/Members'
 import { MiniAppDetail } from './pages/MiniAppDetail'
 import { MiniApps } from './pages/MiniApps'
 import { Overview } from './pages/Overview'
+import { Profile } from './pages/Profile'
 import { useAuth } from './store/auth'
 
 export function App() {
@@ -24,6 +25,7 @@ export function App() {
         <Route path="mini-apps/:id" element={<MiniAppDetail />} />
         <Route path="keys" element={<Keys />} />
         <Route path="members" element={<Members />} />
+        <Route path="profile" element={<Profile />} />
         <Route path="*" element={<Overview />} />
       </Route>
     </Routes>

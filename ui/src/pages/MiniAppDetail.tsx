@@ -63,7 +63,22 @@ export function MiniAppDetail() {
         </div>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <Pill tone={st.tone}>{t(st.key)}</Pill>
-          {s.status === 'archived' ? (
+          {s.status === 'draft' ? (
+            <button
+              className="btn bad sm"
+              onClick={() => {
+                // Hành động phá hủy: hỏi lại, gói đã tải lên sẽ mất.
+                if (!window.confirm(t('upload.discardConfirm'))) return
+                void run(async () => {
+                  await api.del(`/sellers/me/scripts/${s.id}`)
+                  nav('/mini-apps')
+                  return t('upload.discarded')
+                })
+              }}
+            >
+              {t('upload.discard')}
+            </button>
+          ) : s.status === 'archived' ? (
             <button
               className="btn sm"
               onClick={() =>
@@ -127,15 +142,9 @@ export function MiniAppDetail() {
           onSaved={() => script.reload()}
           onSubmit={() =>
             run(async () => {
-              await api.post(`/sellers/me/scripts/${s.id}/submit`)
+              await api.post(`/sellers/me/scripts/${s.id}/publish`)
               script.reload()
               return t('detail.moderation.submitted')
-            })
-          }
-          onDownloadGraph={() =>
-            run(async () => {
-              await api.download(`/sellers/me/scripts/${s.id}/download?format=graph`, `${s.slug}.json`)
-              return t('detail.graphDownloaded')
             })
           }
         />
@@ -196,13 +205,11 @@ function DetailOverview({
   latest,
   onSaved,
   onSubmit,
-  onDownloadGraph,
 }: {
   s: ScriptDetail
   latest: ScriptVersion | undefined
   onSaved: () => void
   onSubmit: () => void
-  onDownloadGraph: () => void
 }) {
   const { t } = useI18n()
   return (
@@ -212,14 +219,9 @@ function DetailOverview({
         <CardHead
           title={t('detail.caps.title')}
           actions={
-            <>
-              <span className="ep" style={{ marginRight: 8 }}>
-                <b>{t('common.auto')}</b> {t('common.fromGraph')}
-              </span>
-              <button className="btn sm" onClick={onDownloadGraph}>
-                {t('detail.caps.downloadGraph')}
-              </button>
-            </>
+            <span className="ep">
+              <b>{t('common.auto')}</b> {t('common.fromGraph')}
+            </span>
           }
         />
         <div className="card-body">
@@ -227,18 +229,6 @@ function DetailOverview({
             <span className="klab">{t('detail.caps.node')}</span>
             <b className="tnum">{s.node_count}</b>
             <GroupChips groups={s.node_groups_used} />
-          </div>
-          <div className="kv">
-            <span className="klab">{t('detail.caps.vars')}</span>{' '}
-            {latest?.required_variables.length ? (
-              latest.required_variables.map((v) => (
-                <span key={v.key} className="keychip" style={{ marginRight: 5 }}>
-                  {`{{${v.key}}}`}
-                </span>
-              ))
-            ) : (
-              <span className="u-sub">{t('common.none')}</span>
-            )}
           </div>
           <div className="kv">
             <span className="klab">{t('detail.caps.compat')}</span> {t('detail.caps.compatValue')}{' '}
@@ -544,7 +534,9 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
                           <td colSpan={5} style={{ background: 'var(--surface-2)', padding: '6px 16px 12px' }}>
                             <div className="kv">
                               <span className="klab">{t('versions.moderation')}</span>
-                              {v.scan.embedded_credentials_count === 0 ? (
+                              {!v.graph_extracted ? (
+                                <span>{t('versions.noGraph')}</span>
+                              ) : v.scan.embedded_credentials_count === 0 ? (
                                 <span>{t('versions.cleanScan')}</span>
                               ) : (
                                 <span>

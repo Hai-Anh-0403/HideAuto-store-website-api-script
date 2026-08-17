@@ -32,6 +32,13 @@ function authHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+let onUnauthorized: (() => void) | null = null
+
+/** Cho phép store auth biết khi token chết — ví dụ phiên bị đăng xuất từ máy khác. */
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler
+}
+
 /** FastAPI errors are `{detail}` — a string, or a list of validation problems. */
 function messageFrom(status: number, body: unknown): string {
   const detail = (body as { detail?: unknown } | null)?.detail
@@ -51,7 +58,11 @@ function codeFrom(body: unknown): string | undefined {
 async function handle<T>(res: Response): Promise<T> {
   if (res.status === 204) return undefined as T
   const body = await res.json().catch(() => null)
-  if (!res.ok) throw new ApiError(res.status, messageFrom(res.status, body), codeFrom(body))
+  if (!res.ok) {
+    // Token hết hiệu lực (hết hạn, hoặc thiết bị này bị đăng xuất từ nơi khác).
+    if (res.status === 401 && getToken()) onUnauthorized?.()
+    throw new ApiError(res.status, messageFrom(res.status, body), codeFrom(body))
+  }
   return body as T
 }
 
@@ -79,6 +90,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }),
+
+  del: (path: string): Promise<void> => request<void>(path, { method: 'DELETE' }),
 
   /** Multipart upload — the browser sets the boundary, so no Content-Type here. */
   upload: <T>(path: string, form: FormData): Promise<T> =>

@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { BrandLogo } from '../ui/Brand'
 import { useI18n, type MessageKey } from '../i18n'
 import styles from './Sidebar.module.css'
 
@@ -7,6 +8,7 @@ const NAV: { to: string; key: MessageKey; icon: string; end: boolean }[] = [
   { to: '/mini-apps', key: 'nav.miniApps', icon: '🧩', end: false },
   { to: '/keys', key: 'nav.keys', icon: '🔑', end: false },
   { to: '/members', key: 'nav.members', icon: '👥', end: false },
+  { to: '/profile', key: 'nav.profile', icon: '⚙', end: false },
 ]
 
 export function Sidebar({ open = false }: { open?: boolean }) {
@@ -14,7 +16,7 @@ export function Sidebar({ open = false }: { open?: boolean }) {
   return (
     <aside className={open ? `${styles.side} ${styles.open}` : styles.side}>
       <div className={styles.brand}>
-        <div className={styles.logo}>S</div>
+        <BrandLogo size={28} />
         <div>
           <b>storeAutoHide</b>
           <span>{t('nav.tagline')}</span>
@@ -34,7 +36,6 @@ export function Sidebar({ open = false }: { open?: boolean }) {
           </NavLink>
         ))}
       </nav>
-      <div className={styles.foot}>{t('nav.foot')}</div>
     </aside>
   )
 }

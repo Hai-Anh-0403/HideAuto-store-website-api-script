@@ -29,6 +29,19 @@ export interface Seller {
   created_at: string
 }
 
+/** Một lần đăng nhập còn sống — mỗi thiết bị một dòng. */
+export interface SellerSession {
+  id: string
+  device: string | null
+  user_agent: string | null
+  ip: string | null
+  /** Chính thiết bị đang xem danh sách này. */
+  current: boolean
+  created_at: string
+  last_seen_at: string
+  expires_at: string
+}
+
 export interface Capabilities {
   requires_browser: boolean
   browser_platforms: string[]
@@ -95,6 +108,8 @@ export interface ScriptVersion {
   format_version: number
   min_app_version: string | null
   tested_app_version: string | null
+  /** false = gói .exe đóng kín, store chưa đọc được graph nên mọi số dưới đây là rỗng. */
+  graph_extracted: boolean
   node_count: number
   node_groups_used: string[]
   uses_control_flow: boolean
@@ -121,6 +136,7 @@ export interface ScriptInspect {
   app_id: string | null
   workflow_name: string | null
   delivery: ScriptVersion['delivery']
+  graph_extracted: boolean
   node_count: number
   node_groups_used: string[]
   uses_control_flow: boolean

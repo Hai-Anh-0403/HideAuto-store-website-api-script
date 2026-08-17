@@ -65,17 +65,19 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
 }
 
-/* Light — cùng cấu trúc token, tự đạt tương phản AA chứ không "đảo màu là xong". */
+/* Light — cùng cấu trúc token, tự đạt tương phản AA chứ không "đảo màu là xong".
+   Không dùng trắng tinh: nền ngả xám lạnh cho đỡ chói khi nhìn lâu, phân lớp vẫn giữ
+   nguyên thứ tự (nền tối nhất → card sáng nhất → surface-2/3 lún xuống làm hover). */
 :root[data-theme="light"] {
-  --bg-base: #fbfbfd;
-  --surface-1: #ffffff;
-  --surface-2: #f5f6f9;
-  --surface-3: #eceef3;
-  --border: #090c141a;
-  --border-strong: #090c142e;
-  --text-primary: #14171f;
+  --bg-base: #eef0f5;
+  --surface-1: #f9fafd;
+  --surface-2: #f1f3f8;
+  --surface-3: #e6e9f1;
+  --border: #0a0e161f;
+  --border-strong: #0a0e1638;
+  --text-primary: #1b1f27;
   --text-secondary: #565c69;
-  --text-muted: #8a909c;
+  --text-muted: #7a8291;
 
   --brand: #5b4de3;
   --brand-hover: #4a3dd0;
@@ -109,15 +111,15 @@
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg-base: #fbfbfd;
-    --surface-1: #ffffff;
-    --surface-2: #f5f6f9;
-    --surface-3: #eceef3;
-    --border: #090c141a;
-    --border-strong: #090c142e;
-    --text-primary: #14171f;
+    --bg-base: #eef0f5;
+    --surface-1: #f9fafd;
+    --surface-2: #f1f3f8;
+    --surface-3: #e6e9f1;
+    --border: #0a0e161f;
+    --border-strong: #0a0e1638;
+    --text-primary: #1b1f27;
     --text-secondary: #565c69;
-    --text-muted: #8a909c;
+    --text-muted: #7a8291;
 
     --brand: #5b4de3;
     --brand-hover: #4a3dd0;
