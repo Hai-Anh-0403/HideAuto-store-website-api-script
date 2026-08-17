@@ -10,7 +10,9 @@ import zipfile
 from pathlib import Path
 
 import httpx
+import pytest
 
+from app.core.config import settings
 from tests.helpers import (
     OPENAI_SECRET,
     SMTP_SECRET,
@@ -224,6 +226,164 @@ async def test_rejected_version_keeps_the_published_one(client: httpx.AsyncClien
         f"/api/v1/admin/scripts/{script_id}/versions/{bad_version_id}/approve",
         headers=auth(admin),
     )
+    assert r.status_code == 409, r.text
+
+
+async def test_packed_exe_uploads_without_a_graph(client: httpx.AsyncClient) -> None:
+    """A packed .exe keeps its workflow behind the app's key — accept it, flag it."""
+    admin = await admin_token(client)
+    seller = await approved_seller_token(client, admin)
+
+    r = await client.post(
+        "/api/v1/sellers/me/scripts/inspect",
+        files=upload_files(b"MZ-packed-installer-not-a-zip", name="Gmail Warmup.exe"),
+        headers=auth(seller),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["graph_extracted"] is False
+    assert r.json()["suggested_name"] == "Gmail Warmup"
+    assert r.json()["node_count"] == 0
+
+    r = await client.post(
+        "/api/v1/sellers/me/scripts",
+        data={"version": "1.0.0"},
+        files=upload_files(b"MZ-packed-installer-not-a-zip", name="Gmail Warmup.exe"),
+        headers=auth(seller),
+    )
+    assert r.status_code == 201, r.text
+    script_id = r.json()["id"]
+
+    r = await client.get(f"/api/v1/sellers/me/scripts/{script_id}", headers=auth(seller))
+    version = r.json()["versions"][0]
+    assert version["graph_extracted"] is False
+    assert version["delivery"] == "mini_app_exe"
+    assert version["scan"]["embedded_credentials_count"] == 0
+
+    # A .zip stays strict: it is readable, so a missing app.workflow is still a rejection.
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("readme.txt", b"hello")
+    r = await client.post(
+        "/api/v1/sellers/me/scripts",
+        data={"name": "Empty Package", "version": "1.0.0"},
+        files=upload_files(buffer.getvalue()),
+        headers=auth(seller),
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["code"] == "no_app_workflow"
+
+
+async def test_auto_publish_puts_a_clean_upload_straight_on_the_store(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SCRIPT_AUTO_PUBLISH skips review — except when the graph carried secrets."""
+    monkeypatch.setattr(settings, "script_auto_publish", True)
+    admin = await admin_token(client)
+    seller = await approved_seller_token(client, admin)
+
+    r = await client.post(
+        "/api/v1/sellers/me/scripts",
+        data={"name": "Clean App", "version": "1.0.0"},
+        files=upload_files(mini_app_zip(with_secrets=False)),
+        headers=auth(seller),
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "published"
+    assert r.json()["published_at"] is not None
+
+    r = await client.get(f"/api/v1/sellers/me/scripts/{r.json()['id']}", headers=auth(seller))
+    assert r.json()["versions"][0]["status"] == "approved"
+
+    # A packed .exe has nothing to scan — it goes up too.
+    r = await client.post(
+        "/api/v1/sellers/me/scripts",
+        data={"name": "Packed App", "version": "1.0.0"},
+        files=upload_files(b"MZ-packed-installer", name="packed.exe"),
+        headers=auth(seller),
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "published"
+
+    # Secrets in the graph still need a human: the listing stays a draft.
+    r = await client.post(
+        "/api/v1/sellers/me/scripts",
+        data={"name": "Leaky App", "version": "1.0.0"},
+        files=upload_files(mini_app_zip(with_secrets=True)),
+        headers=auth(seller),
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "draft"
+
+
+async def test_draft_upload_can_be_finished_or_discarded(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """publish=false parks the upload as a draft the seller finishes (or throws away)."""
+    monkeypatch.setattr(settings, "script_auto_publish", True)
+    admin = await admin_token(client)
+    seller = await approved_seller_token(client, admin)
+
+    r = await client.post(
+        "/api/v1/sellers/me/scripts",
+        data={"version": "1.0.0", "publish": "false"},
+        files=upload_files(mini_app_zip(with_secrets=False)),
+        headers=auth(seller),
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "draft"
+    draft_id = r.json()["id"]
+
+    # The seller fills the listing in, then puts it on the store themselves.
+    r = await client.patch(
+        f"/api/v1/sellers/me/scripts/{draft_id}",
+        json={"name": "Finished Later", "short_description": "Điền nốt rồi mới đăng."},
+        headers=auth(seller),
+    )
+    assert r.status_code == 200, r.text
+
+    r = await client.post(f"/api/v1/sellers/me/scripts/{draft_id}/publish", headers=auth(seller))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "published"
+    assert r.json()["name"] == "Finished Later"
+
+    # Published listings are not deletable — a buyer may already hold one.
+    r = await client.delete(f"/api/v1/sellers/me/scripts/{draft_id}", headers=auth(seller))
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "not_deletable"
+
+    # A second draft is thrown away instead.
+    r = await client.post(
+        "/api/v1/sellers/me/scripts",
+        data={"name": "Abandoned", "version": "1.0.0", "publish": "false"},
+        files=upload_files(mini_app_zip(with_secrets=False)),
+        headers=auth(seller),
+    )
+    assert r.status_code == 201, r.text
+    abandoned_id = r.json()["id"]
+
+    r = await client.delete(f"/api/v1/sellers/me/scripts/{abandoned_id}", headers=auth(seller))
+    assert r.status_code == 204, r.text
+    r = await client.get(f"/api/v1/sellers/me/scripts/{abandoned_id}", headers=auth(seller))
+    assert r.status_code == 404, r.text
+
+    r = await client.get("/api/v1/sellers/me/scripts", headers=auth(seller))
+    assert [s["name"] for s in r.json()["items"]] == ["Finished Later"]
+
+
+async def test_seller_portal_never_serves_the_graph(client: httpx.AsyncClient) -> None:
+    """The scrubbed graph is the product — the portal only hands back packages."""
+    admin = await admin_token(client)
+    seller = await approved_seller_token(client, admin)
+    script_id = await publish_script(client, seller, admin)
+
+    r = await client.get(
+        f"/api/v1/sellers/me/scripts/{script_id}/download?format=graph", headers=auth(seller)
+    )
+    assert r.status_code == 403, r.text
+    assert r.json()["code"] == "graph_not_downloadable"
+
+    # The default is the package, and there is none until the seller builds one.
+    r = await client.get(f"/api/v1/sellers/me/scripts/{script_id}/download", headers=auth(seller))
     assert r.status_code == 409, r.text
 
 

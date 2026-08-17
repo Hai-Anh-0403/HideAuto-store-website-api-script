@@ -94,6 +94,8 @@ async def create_script(
     changelog: Annotated[str | None, Form()] = None,
     min_app_version: Annotated[str | None, Form()] = None,
     tested_app_version: Annotated[str | None, Form()] = None,
+    # false = park it as a draft the seller publishes once the listing is filled in.
+    publish: Annotated[bool, Form()] = True,
 ) -> ScriptRead:
     payload = build_form_model(
         ScriptCreate,
@@ -104,6 +106,7 @@ async def create_script(
         changelog=changelog,
         min_app_version=min_app_version,
         tested_app_version=tested_app_version,
+        publish=publish,
     )
     content = await _read_upload(file)
     script = await script_service.create_script(
@@ -171,6 +174,25 @@ async def update_script(
     return ScriptRead.model_validate(script)
 
 
+@router.post(
+    "/sellers/me/scripts/{script_id}/publish",
+    response_model=ScriptRead,
+    summary="Put my own draft on the store",
+)
+async def publish_my_script(script_id: PydanticObjectId, seller: ApprovedSeller) -> ScriptRead:
+    script = await script_service.publish_own(seller, script_id)
+    return ScriptRead.model_validate(script)
+
+
+@router.delete(
+    "/sellers/me/scripts/{script_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Discard a draft (published listings cannot be deleted)",
+)
+async def delete_my_script(script_id: PydanticObjectId, seller: ApprovedSeller) -> None:
+    await script_service.delete_draft(seller, script_id)
+
+
 @router.post("/sellers/me/scripts/{script_id}/submit", response_model=ScriptRead)
 async def submit_for_review(script_id: PydanticObjectId, seller: ApprovedSeller) -> ScriptRead:
     script = await script_service.submit_for_review(seller, script_id)
@@ -221,12 +243,12 @@ async def list_mini_app_builds(
 @router.get(
     "/sellers/me/scripts/{script_id}/download",
     response_class=FileResponse,
-    summary="Download your own artifact (scrubbed graph or packaged mini app)",
+    summary="Download your own packaged mini app (.zip) — the graph is not served here",
 )
 async def seller_download(
     script_id: PydanticObjectId,
     seller: ApprovedSeller,
-    format: DownloadFormat = DownloadFormat.GRAPH,
+    format: DownloadFormat = DownloadFormat.EXE,
     version_id: PydanticObjectId | None = None,
 ) -> FileResponse:
     target = await mini_app_service.seller_download(seller, script_id, format, version_id)

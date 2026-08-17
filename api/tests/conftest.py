@@ -39,6 +39,7 @@ def isolated_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     Tests that need these on set them explicitly.
     """
     monkeypatch.setattr(settings, "seller_auto_approve", False)
+    monkeypatch.setattr(settings, "script_auto_publish", False)
     monkeypatch.setattr(settings, "mini_app_template_path", None)
 
 
@@ -52,7 +53,9 @@ def storage_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest_asyncio.fixture
 async def app() -> AsyncIterator[FastAPI]:
-    client = AsyncMongoMockClient()
+    # tz_aware mirrors the real client (see app.core.database): stored datetimes come
+    # back UTC-aware, so code comparing them against `datetime.now(UTC)` behaves the same.
+    client = AsyncMongoMockClient(tz_aware=True)
     await init_beanie(database=client["test_db"], document_models=DOCUMENT_MODELS)
     await Admin(
         email=ADMIN_EMAIL, password_hash=hash_password(ADMIN_PASSWORD), name="Admin"

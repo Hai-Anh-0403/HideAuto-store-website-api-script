@@ -10,9 +10,10 @@ from fastapi.responses import FileResponse
 
 from app.api.deps import CurrentAppIdentity, CurrentAppUser
 from app.core.enums import DownloadFormat
+from app.schemas.license import LicenseRead, LicenseRequest
 from app.schemas.script import ScriptRead
 from app.schemas.seller_member import MemberUsage
-from app.services import mini_app_service, usage_service
+from app.services import activation_service, mini_app_service, usage_service
 
 router = APIRouter(tags=["app"])
 
@@ -26,6 +27,23 @@ async def heartbeat(identity: CurrentAppIdentity) -> MemberUsage:
 async def my_scripts(user: CurrentAppUser) -> list[ScriptRead]:
     scripts = await mini_app_service.list_entitled_scripts(user.id)
     return [ScriptRead.model_validate(s) for s in scripts]
+
+
+@router.post(
+    "/app/scripts/{script_id}/license",
+    response_model=LicenseRead,
+    summary="Activate a packaged mini app (redeem a key) and get a signed licence",
+)
+async def issue_license(
+    script_id: PydanticObjectId, payload: LicenseRequest, identity: CurrentAppIdentity
+) -> LicenseRead:
+    """Called by the packaged mini app: with `key` on first launch, without it later."""
+    return await activation_service.activate(
+        user=identity.user,
+        access_token=identity.access_token,
+        script_id=script_id,
+        data=payload,
+    )
 
 
 @router.get(

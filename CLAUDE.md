@@ -247,6 +247,8 @@ Branch naming: `feat/script-publish`, `fix/credential-scrub`, `docs/db-schema`.
 
 - **[docs/db/mongodb-catalog.md](./docs/db/mongodb-catalog.md)** — MongoDB catalog schema (now)
 - **[docs/db/sql-schema.md](./docs/db/sql-schema.md)** — SQL user/transaction schema (later)
+- **[docs/script-publish-packaging.md](./docs/script-publish-packaging.md)** — upload → publish → repackage flow
+- **[docs/mini-app-licensing.md](./docs/mini-app-licensing.md)** — key → signed licence → mini-app activation (+ the two identity systems)
 - **[.claude/rules/python.md](./.claude/rules/python.md)** — Python/FastAPI code rules
 - **[.claude/rules/store-guardrails.md](./.claude/rules/store-guardrails.md)** — Project guardrails
 - FastAPI interactive docs at `/docs` (Swagger) and `/redoc` when the server is running.

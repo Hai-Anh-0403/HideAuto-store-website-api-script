@@ -17,6 +17,7 @@ from beanie import PydanticObjectId
 from pydantic import BaseModel
 from pymongo.errors import DuplicateKeyError
 
+from app.core.config import settings
 from app.core.enums import (
     ScriptStatus,
     ScriptVersionStatus,
@@ -29,6 +30,7 @@ from app.models.script_version import ScriptVersion
 from app.models.seller import Seller
 from app.repositories import script as script_repo
 from app.repositories import script_version as version_repo
+from app.repositories import upload as upload_repo
 from app.schemas.script import ScriptCreate, ScriptInspect, ScriptUpdate, ScriptVersionCreate
 from app.services import upload_service
 from app.utils.ids import require_id, slugify
@@ -129,6 +131,7 @@ async def _create_version(
         delivery=package.delivery,
         min_app_version=meta.min_app_version,
         tested_app_version=meta.tested_app_version,
+        graph_extracted=package.graph_extracted,
         node_count=derived.node_count,
         node_groups_used=derived.node_groups_used,
         uses_control_flow=derived.uses_control_flow,
@@ -160,6 +163,91 @@ async def _create_version(
     return created
 
 
+def _release(
+    script: Script, version: ScriptVersion, *, reviewed_by: PydanticObjectId | None
+) -> None:
+    """Mark a version live and point the listing at it — the caller saves both docs.
+
+    `reviewed_by` is empty whenever nobody actually reviewed it (auto-publish, or the
+    seller publishing their own draft).
+    """
+    now = datetime.now(UTC)
+    version.status = ScriptVersionStatus.APPROVED
+    version.released_at = now
+    version.moderation.reviewed_by = reviewed_by
+    version.moderation.reviewed_at = now
+    version.moderation.reason = None
+
+    _copy_denormalized(script, version)
+    script.status = ScriptStatus.PUBLISHED
+    script.reject_reason = None
+    script.published_at = script.published_at or now
+    script.updated_at = now
+
+
+async def _auto_publish(script: Script, version: ScriptVersion) -> None:
+    """Put a fresh upload straight on the store when `SCRIPT_AUTO_PUBLISH` is on.
+
+    Two cases still stay put: a graph that came in with embedded credentials (the one
+    thing review exists for), and an archived listing, which only the seller may restore.
+    """
+    if not settings.script_auto_publish:
+        return
+    if version.scan.embedded_credentials_count > 0 or script.status == ScriptStatus.ARCHIVED:
+        return
+
+    _release(script, version, reviewed_by=None)
+    await version.save()
+    await script.save()
+
+
+async def publish_own(seller: Seller, script_id: PydanticObjectId) -> Script:
+    """The seller puts their own draft on the store — no reviewer in the loop.
+
+    Same gate as an admin approval: a graph that still carries credentials is refused.
+    """
+    script = await _owned_script(require_id(seller.id), script_id)
+    if script.status not in _SUBMITTABLE:
+        raise ConflictError(
+            f"Script cannot be published (status={script.status.value})", code="not_publishable"
+        )
+    versions = await version_repo.list_for_script(require_id(script.id))
+    version = next((v for v in versions if v.status == ScriptVersionStatus.PENDING_REVIEW), None)
+    if version is None:
+        raise ConflictError(
+            "No version waiting to go live — upload one first", code="no_pending_version"
+        )
+    if version.scan.embedded_credentials_count > 0:
+        raise ConflictError(
+            f"Version still contains {version.scan.embedded_credentials_count} embedded "
+            "credential(s); remove them and re-upload",
+            code="credentials_present",
+        )
+
+    _release(script, version, reviewed_by=None)
+    await version.save()
+    await script.save()
+    return script
+
+
+async def delete_draft(seller: Seller, script_id: PydanticObjectId) -> None:
+    """Throw away a draft the seller never finished.
+
+    Only a draft may go: once a listing has been published, buyers can already hold it.
+    Stored blobs stay — storage is content-addressed and shared between versions, so only
+    the `uploads` rows pointing at them are removed.
+    """
+    script = await _owned_script(require_id(seller.id), script_id)
+    if script.status not in _SUBMITTABLE:
+        raise ConflictError(
+            f"Only a draft can be deleted (status={script.status.value})", code="not_deletable"
+        )
+    for version in await version_repo.list_for_script(require_id(script.id)):
+        await upload_repo.delete_by_id(version.file_id)
+        await version_repo.delete(version)
+    await script_repo.delete(script)
+
+
 def _suggested_name(prepared: _PreparedUpload) -> str:
     """The mini app's own name, falling back to the uploaded file name."""
     package = prepared.package
@@ -176,6 +264,7 @@ async def inspect_upload(content: bytes, filename: str) -> ScriptInspect:
         app_id=prepared.package.app_id,
         workflow_name=prepared.package.workflow_name,
         delivery=prepared.package.delivery,
+        graph_extracted=prepared.package.graph_extracted,
         node_count=derived.node_count,
         node_groups_used=derived.node_groups_used,
         uses_control_flow=derived.uses_control_flow,
@@ -220,6 +309,8 @@ async def create_script(
     _copy_denormalized(created, version)
     created.updated_at = datetime.now(UTC)
     await created.save()
+    if data.publish:
+        await _auto_publish(created, version)
     return created
 
 
@@ -245,6 +336,7 @@ async def add_version(
         script.reject_reason = None
     script.updated_at = datetime.now(UTC)
     await script.save()
+    await _auto_publish(script, version)
     return version
 
 
@@ -372,19 +464,8 @@ async def approve_version(
             code="credentials_present",
         )
 
-    now = datetime.now(UTC)
-    version.status = ScriptVersionStatus.APPROVED
-    version.released_at = now
-    version.moderation.reviewed_by = admin_id
-    version.moderation.reviewed_at = now
-    version.moderation.reason = None
+    _release(script, version, reviewed_by=admin_id)
     await version.save()
-
-    _copy_denormalized(script, version)
-    script.status = ScriptStatus.PUBLISHED
-    script.reject_reason = None
-    script.published_at = script.published_at or now
-    script.updated_at = now
     await script.save()
     return version
 

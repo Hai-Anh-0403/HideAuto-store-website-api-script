@@ -167,6 +167,7 @@ Chi tiết trường: [db/mongodb-catalog.md](./db/mongodb-catalog.md).
 | `GET /sellers/me/scripts/{id}/download?format=graph\|exe` | seller tải artifact của chính mình |
 | `GET /app/scripts` | end-user liệt kê mini app **đã mở khóa** |
 | `GET /app/scripts/{id}/download?format=exe\|graph` | end-user tải (kiểm tra entitlement) |
+| `POST /app/scripts/{id}/license` | **mini app kích hoạt**: `{key?, machine_id}` → licence đã ký |
 
 ### 6.2 Khóa & quyền truy cập
 
@@ -174,6 +175,16 @@ Chi tiết trường: [db/mongodb-catalog.md](./db/mongodb-catalog.md).
 - Redeem khóa → `seller_members.script_ids` thêm app đó (`all_scripts = true` với khóa toàn shop).
   Cùng 1 user redeem nhiều khóa của cùng seller ⇒ vẫn 1 membership, cộng dồn danh sách app.
 - Tải về yêu cầu: script `published` + membership `active` + app nằm trong entitlement.
+
+### 6.3 Kích hoạt mini app bằng key
+
+Khóa ở trên mới mở **quyền tải**. Muốn khóa cả **quyền chạy** gói đã tải thì gói phải tự kiểm
+licence: store ký, mini app verify. Gói đóng ra vì thế mang thêm khối `store`
+(`baseUrl`, `scriptId`, `licensePublicKey`…) trong `resources/app.workflow`, và mini app gọi
+`POST /app/scripts/{id}/license` để đổi key lấy licence.
+
+Chi tiết đầy đủ (định dạng licence, mã lỗi, cấu hình, phần còn phải làm ở app):
+**[mini-app-licensing.md](./mini-app-licensing.md)**.
 
 ### 6.1 Khác biệt so với thiết kế ban đầu (đã code thế này)
 

@@ -1,6 +1,9 @@
 """Password hashing + JWT creation/decoding for portal auth (sellers + admins)."""
 
+import asyncio
+import secrets
 from datetime import UTC, datetime, timedelta
+from typing import NamedTuple
 
 import bcrypt
 from jose import JWTError, jwt
@@ -26,25 +29,51 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(*, subject_id: str, role: Role) -> str:
-    """Encode a portal access token. Subject format: '<role>:<id>'."""
+# bcrypt is deliberately slow (~200ms a call here). Run it on a worker thread so one
+# login does not stall every other request on the event loop.
+async def hash_password_async(plain: str) -> str:
+    return await asyncio.to_thread(hash_password, plain)
+
+
+async def verify_password_async(plain: str, hashed: str) -> bool:
+    return await asyncio.to_thread(verify_password, plain, hashed)
+
+
+class IssuedToken(NamedTuple):
+    """A freshly minted token plus what a session row needs to track it."""
+
+    token: str
+    jti: str
+    expires_at: datetime
+
+
+def create_access_token(*, subject_id: str, role: Role) -> IssuedToken:
+    """Encode a portal access token. Subject format: '<role>:<id>'.
+
+    Every token carries a `jti` so the sign-in behind it can be listed and revoked.
+    """
     now = datetime.now(UTC)
     expire = now + timedelta(minutes=settings.access_token_expire_minutes)
+    jti = secrets.token_urlsafe(24)
     payload = {
         "sub": f"{role.value}:{subject_id}",
         "role": role.value,
+        "jti": jti,
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp()),
     }
-    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    return IssuedToken(token=token, jti=jti, expires_at=expire)
 
 
 class TokenData:
     """Decoded portal token identity."""
 
-    def __init__(self, subject_id: str, role: Role) -> None:
+    def __init__(self, subject_id: str, role: Role, jti: str | None) -> None:
         self.subject_id = subject_id
         self.role = role
+        # Tokens minted before sessions existed carry no jti; those are refused.
+        self.jti = jti
 
 
 def decode_access_token(token: str) -> TokenData | None:
@@ -64,4 +93,5 @@ def decode_access_token(token: str) -> TokenData | None:
         role = Role(role_raw)
     except ValueError:
         return None
-    return TokenData(subject_id=id_part, role=role)
+    jti = payload.get("jti")
+    return TokenData(subject_id=id_part, role=role, jti=jti if isinstance(jti, str) else None)

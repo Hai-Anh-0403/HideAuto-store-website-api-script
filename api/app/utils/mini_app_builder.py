@@ -24,9 +24,15 @@ def build_envelope(
     workflow_id: str,
     workflow_name: str,
     graph: dict[str, Any],
+    store: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The exact shape the desktop app expects to find in `resources/app.workflow`."""
-    return {
+    """The exact shape the desktop app expects to find in `resources/app.workflow`.
+
+    `store` is the activation block (see `build_store_block`). Older app builds ignore
+    unknown keys, so a package carrying it still opens in an app without the licence
+    gate — it just won't ask for a key.
+    """
+    envelope: dict[str, Any] = {
         "version": EMBED_FORMAT_VERSION,
         "appName": app_name,
         "appId": app_id,
@@ -34,6 +40,23 @@ def build_envelope(
         "workflowName": workflow_name,
         "builtAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "workflow": graph,
+    }
+    if store is not None:
+        envelope["store"] = store
+    return envelope
+
+
+def build_store_block(
+    *, script_id: str, seller_name: str, base_url: str, public_key: str
+) -> dict[str, Any]:
+    """Everything the packaged mini app needs to activate itself:
+    who to call, which mini app it is, and the key that proves the answer is ours."""
+    return {
+        "baseUrl": base_url.rstrip("/"),
+        "scriptId": script_id,
+        "sellerName": seller_name,
+        "licensePublicKey": public_key,
+        "licenseAlgorithm": "Ed25519",
     }
 
 

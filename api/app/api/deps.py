@@ -3,19 +3,21 @@
 from typing import Annotated, Any
 
 from beanie import PydanticObjectId
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ValidationError
 
 from app.core.enums import Role, SellerStatus
-from app.core.exceptions import ForbiddenError
+from app.core.exceptions import AuthError, ForbiddenError
 from app.core.security import decode_access_token
 from app.models.admin import Admin
 from app.models.seller import Seller
+from app.models.seller_session import SellerSession
 from app.repositories import admin as admin_repo
 from app.repositories import seller as seller_repo
 from app.schemas.common import Page  # noqa: F401  (re-exported for convenience)
-from app.services import flowdesk_client
+from app.services import flowdesk_client, session_service
+from app.utils.client_info import read_client
 
 _portal_bearer = HTTPBearer(auto_error=True, description="Portal JWT (seller/admin)")
 _app_bearer = HTTPBearer(auto_error=True, description="Flowdesk end-user access token")
@@ -25,16 +27,40 @@ def _unauthorized(detail: str = "Not authenticated") -> HTTPException:
     return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
 
-async def get_current_seller(
+class SellerContext:
+    """The signed-in seller plus the session row this request's token belongs to."""
+
+    def __init__(self, seller: Seller, session: SellerSession) -> None:
+        self.seller = seller
+        self.session = session
+
+
+async def get_seller_context(
+    request: Request,
     creds: Annotated[HTTPAuthorizationCredentials, Depends(_portal_bearer)],
-) -> Seller:
+) -> SellerContext:
+    """Authenticate a seller and keep their session alive.
+
+    A seller token is only good while its session row is: signing a device out from
+    the device list invalidates the token it was issued with, right away.
+    """
     data = decode_access_token(creds.credentials)
-    if data is None or data.role != Role.SELLER:
+    if data is None or data.role != Role.SELLER or data.jti is None:
         raise _unauthorized()
-    seller = await seller_repo.get_by_id(PydanticObjectId(data.subject_id))
+    session = await session_service.resolve(data.jti)
+    if session is None:
+        # Signed out from another device, revoked, or simply aged out.
+        raise AuthError("Session is no longer active", code="session_ended")
+    # The session row owns the seller ref, so a malformed subject can't reach the DB.
+    seller = await seller_repo.get_by_id(session.seller_id)
     if seller is None:
         raise _unauthorized()
-    return seller
+    await session_service.touch(session, read_client(request))
+    return SellerContext(seller=seller, session=session)
+
+
+async def get_current_seller(ctx: Annotated[SellerContext, Depends(get_seller_context)]) -> Seller:
+    return ctx.seller
 
 
 async def require_approved_seller(
@@ -113,6 +139,7 @@ def get_pagination(
 
 
 CurrentSeller = Annotated[Seller, Depends(get_current_seller)]
+CurrentSellerCtx = Annotated[SellerContext, Depends(get_seller_context)]
 ApprovedSeller = Annotated[Seller, Depends(require_approved_seller)]
 CurrentAdmin = Annotated[Admin, Depends(get_current_admin)]
 CurrentAppUser = Annotated[flowdesk_client.FlowdeskUser, Depends(get_current_app_user)]

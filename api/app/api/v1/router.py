@@ -2,11 +2,21 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.routes import admin_users, app_client, auth, keys, members, scripts, sellers
+from app.api.v1.routes import (
+    admin_users,
+    app_client,
+    auth,
+    keys,
+    members,
+    scripts,
+    sellers,
+    sessions,
+)
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(sellers.router)
+api_router.include_router(sessions.router)
 api_router.include_router(keys.router)
 api_router.include_router(members.router)
 api_router.include_router(scripts.router)

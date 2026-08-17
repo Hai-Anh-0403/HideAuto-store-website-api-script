@@ -40,6 +40,10 @@ class ScriptVersion(Document):
     min_app_version: str | None = None
     tested_app_version: str | None = None
 
+    # False when the upload was an opaque binary: the graph could not be read, so every
+    # derived field below is empty and `scan` means "not scanned", not "found nothing".
+    graph_extracted: bool = True
+
     # Derived from the graph — never taken from the seller.
     node_count: int = 0
     node_groups_used: list[str] = Field(default_factory=list)

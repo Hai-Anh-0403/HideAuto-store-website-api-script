@@ -13,6 +13,10 @@ async def get_by_id(version_id: PydanticObjectId) -> ScriptVersion | None:
     return await ScriptVersion.get(version_id)
 
 
+async def delete(version: ScriptVersion) -> None:
+    await version.delete()
+
+
 async def list_for_script(script_id: PydanticObjectId) -> list[ScriptVersion]:
     return await (
         ScriptVersion.find(ScriptVersion.script_id == script_id).sort("-created_at").to_list()

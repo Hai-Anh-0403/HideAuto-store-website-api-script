@@ -23,6 +23,7 @@ class ScriptInspect(BaseModel):
     app_id: str | None
     workflow_name: str | None
     delivery: DeliveryFormat
+    graph_extracted: bool
     node_count: int
     node_groups_used: list[str]
     uses_control_flow: bool
@@ -43,6 +44,9 @@ class ScriptCreate(BaseModel):
     changelog: str | None = Field(default=None, max_length=2_000)
     min_app_version: str | None = Field(default=None, pattern=SEMVER_PATTERN)
     tested_app_version: str | None = Field(default=None, pattern=SEMVER_PATTERN)
+    # false = park it as a draft; the seller is still filling the listing in and will
+    # publish it later. Has no effect while `SCRIPT_AUTO_PUBLISH` is off.
+    publish: bool = True
 
 
 class ScriptUpdate(BaseModel):
@@ -125,6 +129,7 @@ class ScriptVersionRead(BaseModel):
     format_version: int
     min_app_version: str | None
     tested_app_version: str | None
+    graph_extracted: bool
     node_count: int
     node_groups_used: list[str]
     uses_control_flow: bool

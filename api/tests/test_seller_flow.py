@@ -182,6 +182,69 @@ async def test_auto_approve_lets_a_new_seller_work_immediately(
     assert r.status_code == 201, r.text
 
 
+async def test_seller_edits_profile_and_changes_password(client: httpx.AsyncClient) -> None:
+    """A pending seller can still read/edit the profile and rotate the password."""
+    _seller_id, token = await _register_and_login_seller(client)
+
+    r = await client.get("/api/v1/sellers/me", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    assert r.json()["email"] == "seller@teststore.com"
+
+    r = await client.patch(
+        "/api/v1/sellers/me",
+        json={"name": "Seller Renamed", "contact": "t.me/seller"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "Seller Renamed"
+    assert r.json()["contact"] == "t.me/seller"
+
+    # Clearing the optional contact is allowed; the display name is left alone.
+    r = await client.patch("/api/v1/sellers/me", json={"contact": None}, headers=_auth(token))
+    assert r.status_code == 200, r.text
+    assert r.json()["contact"] is None
+    assert r.json()["name"] == "Seller Renamed"
+
+    # Wrong current password → 400 with a translatable code, password untouched.
+    r = await client.post(
+        "/api/v1/sellers/me/password",
+        json={"current_password": "not-my-password", "new_password": "seller54321"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 400, r.text
+    assert r.json()["code"] == "wrong_password"
+
+    # Reusing the same password is refused too.
+    r = await client.post(
+        "/api/v1/sellers/me/password",
+        json={"current_password": "seller12345", "new_password": "seller12345"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "password_unchanged"
+
+    r = await client.post(
+        "/api/v1/sellers/me/password",
+        json={"current_password": "seller12345", "new_password": "seller54321"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 200, r.text
+    # Only this device was signed in, so nothing else got signed out.
+    assert r.json()["signed_out"] == 0
+
+    # Only the new password logs in from now on.
+    r = await client.post(
+        "/api/v1/sellers/login",
+        json={"email": "seller@teststore.com", "password": "seller12345"},
+    )
+    assert r.status_code == 401, r.text
+    r = await client.post(
+        "/api/v1/sellers/login",
+        json={"email": "seller@teststore.com", "password": "seller54321"},
+    )
+    assert r.status_code == 200, r.text
+
+
 async def test_bad_key_redeem(client: httpx.AsyncClient, app: FastAPI) -> None:
     fake_user = FlowdeskUser(id="u9", email="u9@x.com", name=None)
     app.dependency_overrides[get_app_identity] = lambda: AppIdentity(fake_user, "t")

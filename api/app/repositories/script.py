@@ -16,6 +16,10 @@ async def get_by_id(script_id: PydanticObjectId) -> Script | None:
     return await Script.get(script_id)
 
 
+async def delete(script: Script) -> None:
+    await script.delete()
+
+
 async def get_by_slug(slug: str) -> Script | None:
     return await Script.find_one(Script.slug == slug)
 

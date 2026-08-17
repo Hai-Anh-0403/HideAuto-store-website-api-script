@@ -33,9 +33,9 @@ from app.repositories import script as script_repo
 from app.repositories import script_version as version_repo
 from app.repositories import seller_member as member_repo
 from app.repositories import upload as upload_repo
-from app.services import key_service, storage_service, upload_service
+from app.services import key_service, license_service, storage_service, upload_service
 from app.utils.ids import require_id
-from app.utils.mini_app_builder import build_envelope, inject_workflow
+from app.utils.mini_app_builder import build_envelope, build_store_block, inject_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,20 @@ async def _load_graph(version: ScriptVersion) -> dict[str, Any]:
     return parsed
 
 
+def _store_block(script: Script) -> dict[str, Any] | None:
+    """Activation block for the package — omitted when licensing is not configured, so a
+    store without signing keys still produces working (unlocked) packages."""
+    if not license_service.is_configured():
+        logger.warning("LICENSE_SIGNING_KEY unset — packaging %s without a licence gate", script.id)
+        return None
+    return build_store_block(
+        script_id=str(require_id(script.id)),
+        seller_name=script.seller.name,
+        base_url=settings.store_public_url,
+        public_key=license_service.public_key_b64(),
+    )
+
+
 async def create_build(
     seller: Seller, script_id: PydanticObjectId, version_id: PydanticObjectId | None = None
 ) -> MiniAppBuild:
@@ -122,6 +136,7 @@ async def create_build(
         workflow_id=str(require_id(version.id)),
         workflow_name=script.name,
         graph=graph,
+        store=_store_block(script),
     )
     package = await asyncio.to_thread(inject_workflow, template, envelope)
 
@@ -212,7 +227,17 @@ async def seller_download(
     fmt: DownloadFormat,
     version_id: PydanticObjectId | None = None,
 ) -> DownloadTarget:
-    """A seller may always pull their own artifacts, published or not."""
+    """A seller pulls their own packaged build — the portal never hands back the graph.
+
+    The scrubbed graph is the thing being sold; serving it here would turn every listing
+    into a plain JSON download. Buyers still get it through `/app/scripts/...`, which is
+    gated on an entitlement.
+    """
+    if fmt is DownloadFormat.GRAPH:
+        raise ForbiddenError(
+            "The workflow graph is not downloadable from the seller portal",
+            code="graph_not_downloadable",
+        )
     script = await _owned_script(require_id(seller.id), script_id)
     if version_id is not None:
         version = await version_repo.get_by_id(version_id)
