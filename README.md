@@ -51,21 +51,6 @@ MongoDB và chung thư mục artifact `api/var/`, nên đổi qua lại không m
 
 ---
 
-## Dữ liệu mẫu (tuỳ chọn)
-
-```bash
-cd api && uv run python scripts/seed_demo.py
-```
-
-Tạo seller `demo-seller@storeauto.dev` / `seller12345` (đã duyệt) với 5 mini app đủ trạng thái
-(đang bán / chờ duyệt / nháp còn credential / bị từ chối), khóa theo từng app, một bản đóng gói
-`.zip`, và 4 người dùng có lịch sử online. Chạy lại nhiều lần được — chỉ làm mới thời điểm online.
-Script chặn chạy khi `ENV` không phải `dev`/`local`/`test`.
-
-Xoá sạch để làm lại: `docker exec sah-mongo mongosh storeautohide --eval "db.dropDatabase()"`.
-
----
-
 ## Thử một vòng đầy đủ
 
 1. **UI** → tab *Đăng ký* → tạo seller. Với `SELLER_AUTO_APPROVE=true` (mặc định trong
