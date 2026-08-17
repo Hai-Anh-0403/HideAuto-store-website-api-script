@@ -4,6 +4,7 @@ import { Card, CardHead } from '../ui/Card'
 import { CapsChips } from '../ui/CapsChips'
 import { GroupChips } from '../ui/GroupChips'
 import { Pill } from '../ui/Pill'
+import { Pager } from '../ui/Pager'
 import { Empty, ErrorState, PendingApproval, TableSkeleton } from '../ui/States'
 import { useToast } from '../ui/Toast'
 import { useI18n } from '../i18n'
@@ -14,16 +15,22 @@ import { useFetch } from '../lib/useFetch'
 import { useAuth } from '../store/auth'
 import type { Page, Script, ScriptDetail, ScriptVersion } from '../types'
 
+const PAGE_SIZE = 10
+
 export function MiniApps() {
   const { seller } = useAuth()
   const { t, lang } = useI18n()
   const approved = seller?.status === 'approved'
   const nav = useNavigate()
   const [showUpload, setShowUpload] = useState(false)
+  const [skip, setSkip] = useState(0)
 
   const scripts = useFetch(
-    () => (approved ? api.get<Page<Script>>('/sellers/me/scripts?limit=100') : Promise.resolve(null)),
-    `scripts:${approved}`,
+    () =>
+      approved
+        ? api.get<Page<Script>>(`/sellers/me/scripts?skip=${skip}&limit=${PAGE_SIZE}`)
+        : Promise.resolve(null),
+    `scripts:${approved}:${skip}`,
   )
   const items = scripts.data?.items ?? []
 
@@ -122,6 +129,9 @@ export function MiniApps() {
               </tbody>
             </table>
           </div>
+        )}
+        {scripts.data && (
+          <Pager skip={skip} limit={PAGE_SIZE} total={scripts.data.total} onChange={setSkip} />
         )}
         <div className="card-foot">
           <span className="note">{t('miniApps.foot')}</span>

@@ -257,7 +257,7 @@ function ChangePassword({ onChanged }: { onChanged: () => void }) {
       <form onSubmit={submit} style={{ padding: 16 }}>
         {mismatch && <ErrorState message={t('profile.pw.mismatch')} />}
         {error != null && <ErrorState message={errorText(error)} />}
-        <div className="grid2">
+        <div style={{ maxWidth: 440 }}>
           <label className="field">
             <span>{t('profile.pw.current')}</span>
             <input
@@ -269,8 +269,6 @@ function ChangePassword({ onChanged }: { onChanged: () => void }) {
               required
             />
           </label>
-        </div>
-        <div className="grid2">
           <label className="field">
             <span>{t('profile.pw.new')}</span>
             <input

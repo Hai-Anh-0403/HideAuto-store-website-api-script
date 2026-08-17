@@ -6,7 +6,7 @@ from beanie import PydanticObjectId
 
 from app.core.config import settings
 from app.core.enums import SellerStatus
-from app.core.exceptions import AppError, AuthError, ConflictError, NotFoundError
+from app.core.exceptions import AppError, AuthError, ConflictError, ForbiddenError, NotFoundError
 from app.core.security import hash_password_async, verify_password_async
 from app.models.seller import Seller
 from app.repositories import seller as seller_repo
@@ -23,7 +23,7 @@ async def register(data: SellerRegister) -> Seller:
     `approved_by` stays empty because no admin actually looked at the account.
     """
     if await seller_repo.get_by_email(data.email) is not None:
-        raise ConflictError("Email already registered")
+        raise ConflictError("This email is already registered", code="email_taken")
     auto = settings.seller_auto_approve
     seller = Seller(
         email=data.email,
@@ -37,9 +37,21 @@ async def register(data: SellerRegister) -> Seller:
 
 
 async def authenticate(email: str, password: str) -> Seller:
+    """Sign a seller in — or refuse with a specific, translatable reason.
+
+    A wrong email and a wrong password give the *same* `invalid_credentials` so the
+    endpoint never reveals which emails have accounts. Only once the password checks out
+    does the account state decide the outcome: `pending`/`approved` sign in (a pending
+    seller gets a limited portal — profile and password only), while `rejected` and
+    `suspended` are turned away, each with its own code so the UI can say why.
+    """
     seller = await seller_repo.get_by_email(email)
     if seller is None or not await verify_password_async(password, seller.password_hash):
-        raise AuthError("Invalid credentials")
+        raise AuthError("Invalid email or password", code="invalid_credentials")
+    if seller.status is SellerStatus.REJECTED:
+        raise ForbiddenError("This seller account was rejected", code="seller_rejected")
+    if seller.status is SellerStatus.SUSPENDED:
+        raise ForbiddenError("This seller account is suspended", code="seller_suspended")
     return seller
 
 

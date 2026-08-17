@@ -58,7 +58,12 @@ class Script(Document):
         name = "scripts"
         indexes = [
             pymongo.IndexModel([("slug", pymongo.ASCENDING)], unique=True),
-            pymongo.IndexModel([("seller.id", pymongo.ASCENDING)]),
+            # Seller listing: filter by seller, newest first — one compound index
+            # both narrows to the seller and serves the -created_at sort, so a seller
+            # with many apps never triggers a full scan or an in-memory sort.
+            pymongo.IndexModel(
+                [("seller.id", pymongo.ASCENDING), ("created_at", pymongo.DESCENDING)]
+            ),
             pymongo.IndexModel([("status", pymongo.ASCENDING)]),
             pymongo.IndexModel([("category_id", pymongo.ASCENDING)]),
             pymongo.IndexModel([("tag_ids", pymongo.ASCENDING)]),

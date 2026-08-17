@@ -18,7 +18,7 @@ async def authenticate(email: str, password: str) -> Admin:
         or not admin.is_active
         or not await verify_password_async(password, admin.password_hash)
     ):
-        raise AuthError("Invalid credentials")
+        raise AuthError("Invalid email or password", code="invalid_credentials")
     return admin
 
 

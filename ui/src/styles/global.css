@@ -206,6 +206,16 @@ tbody tr:hover { background: var(--surface-2); }
 textarea.input { height: auto; min-height: 84px; padding: 8px 10px; line-height: 1.5; resize: vertical; }
 .input::placeholder { color: var(--text-muted); }
 .input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+.input.bad { border-color: var(--danger); }
+.input.bad:focus-visible { outline-color: var(--danger); border-color: var(--danger); }
+.field > span.field-error { margin: 5px 0 0; color: var(--danger); font-weight: 400; }
+
+/* Pagination bar (skip/limit lists) */
+.pager {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; border-top: 1px solid var(--border);
+}
+.pager-btns { display: flex; gap: 8px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .formrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
 
@@ -225,12 +235,40 @@ textarea.input { height: auto; min-height: 84px; padding: 8px 10px; line-height:
 @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
 
 /* Signed-out screen */
-.login { min-height: 100%; display: grid; place-items: center; padding: 32px 16px; }
-.login-box { width: min(400px, 100%); }
-.login-brand { text-align: center; margin-bottom: 16px; }
-.login-brand svg { display: block; margin: 0 auto 10px; }
-.login-brand b { font-size: 17px; font-weight: 600; }
-.login-brand span { display: block; color: var(--text-muted); font-size: 12.5px; }
+.login { min-height: 100dvh; display: grid; place-items: center; padding: 32px 16px; }
+.login-shell { width: min(400px, 100%); }
+.login-panel { width: 100%; }
+
+.login-hero { text-align: center; margin-bottom: 20px; }
+.login-hero svg { display: block; margin: 0 auto 12px; }
+.login-hero b { display: block; font-size: 20px; font-weight: 600; }
+.login-hero .sub { display: block; margin-top: 4px; color: var(--text-muted); font-size: 12.5px; }
+.login-features {
+  list-style: none; margin: 18px auto 0; max-width: 300px;
+  display: grid; gap: 11px; text-align: left;
+}
+.login-features li {
+  display: flex; gap: 10px; align-items: center;
+  color: var(--text-secondary); font-size: 13px;
+}
+.login-features .fi {
+  flex: none; width: 18px; height: 18px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 10px;
+  background: var(--brand-tint); color: var(--brand);
+}
+
+/* Desktop: brand + value props on the left, the form card on the right. */
+@media (min-width: 780px) {
+  .login-shell {
+    width: min(900px, 100%);
+    display: grid; grid-template-columns: 1fr 400px; gap: 56px; align-items: center;
+  }
+  .login-hero { text-align: left; margin-bottom: 0; }
+  .login-hero svg { margin-left: 0; }
+  .login-features { margin-left: 0; }
+}
+/* Small screens stay a single compact column — drop the value props. */
+@media (max-width: 779px) { .login-features { display: none; } }
 
 /* --- Responsive -------------------------------------------------------------------
    Mật độ giảm dần theo bề ngang: 4 → 2 tile, nhãn trong .kv nhảy lên trên giá trị,

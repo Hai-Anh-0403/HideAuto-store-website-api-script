@@ -12,6 +12,7 @@
   padding: 22px 24px 60px;
   max-width: 1120px;
   width: 100%;
+  margin-inline: auto;
 }
 
 /* Dưới ngưỡng này rail trở thành drawer trượt, workspace chiếm trọn bề ngang. */

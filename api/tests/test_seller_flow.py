@@ -255,3 +255,67 @@ async def test_bad_key_redeem(client: httpx.AsyncClient, app: FastAPI) -> None:
         assert r.status_code == 404, r.text
     finally:
         app.dependency_overrides.clear()
+
+
+async def test_login_and_register_surface_a_code_for_every_case(
+    client: httpx.AsyncClient,
+) -> None:
+    """Every sign-in / sign-up failure carries a stable code the UI can translate."""
+    admin_token = await _admin_token(client)
+
+    r = await client.post(
+        "/api/v1/sellers/register",
+        json={"email": "case@teststore.com", "password": "seller12345", "name": "Case"},
+    )
+    assert r.status_code == 201, r.text
+    seller_id = r.json()["id"]
+
+    # Registering the same email again is refused with a translatable code.
+    r = await client.post(
+        "/api/v1/sellers/register",
+        json={"email": "case@teststore.com", "password": "seller12345", "name": "Case Again"},
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "email_taken"
+
+    # A wrong password and an unknown email give the SAME code — no account-existence leak.
+    for email, password in (
+        ("case@teststore.com", "wrong-password"),
+        ("nobody@teststore.com", "seller12345"),
+    ):
+        r = await client.post("/api/v1/sellers/login", json={"email": email, "password": password})
+        assert r.status_code == 401, r.text
+        assert r.json()["code"] == "invalid_credentials"
+
+    # A pending account still signs in — it gets the limited portal.
+    r = await client.post(
+        "/api/v1/sellers/login",
+        json={"email": "case@teststore.com", "password": "seller12345"},
+    )
+    assert r.status_code == 200, r.text
+
+    # Rejected → turned away at login with its own code.
+    r = await client.post(
+        f"/api/v1/admin/sellers/{seller_id}/reject",
+        json={"reason": "spam"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    r = await client.post(
+        "/api/v1/sellers/login",
+        json={"email": "case@teststore.com", "password": "seller12345"},
+    )
+    assert r.status_code == 403, r.text
+    assert r.json()["code"] == "seller_rejected"
+
+    # Approve, then suspend → a different code again.
+    r = await client.post(f"/api/v1/admin/sellers/{seller_id}/approve", headers=_auth(admin_token))
+    assert r.status_code == 200, r.text
+    r = await client.post(f"/api/v1/admin/sellers/{seller_id}/suspend", headers=_auth(admin_token))
+    assert r.status_code == 200, r.text
+    r = await client.post(
+        "/api/v1/sellers/login",
+        json={"email": "case@teststore.com", "password": "seller12345"},
+    )
+    assert r.status_code == 403, r.text
+    assert r.json()["code"] == "seller_suspended"
