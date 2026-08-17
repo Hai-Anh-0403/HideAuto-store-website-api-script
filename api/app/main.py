@@ -9,9 +9,10 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.database import close_db, init_db
+from app.core.database import close_db, get_client, init_db
 from app.core.exceptions import AppError
 from app.services.admin_service import seed_initial_admin
+from app.services.flowdesk_client import close_client, init_client
 
 logging.basicConfig(level=logging.INFO)
 
@@ -19,8 +20,10 @@ logging.basicConfig(level=logging.INFO)
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await init_db()
+    await init_client()
     await seed_initial_admin()
     yield
+    await close_client()
     await close_db()
 
 
@@ -36,6 +39,8 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, str]:
+        client = get_client()
+        await client.admin.command("ping")
         return {"status": "ok", "app": settings.app_name}
 
     app.include_router(api_router, prefix="/api/v1")

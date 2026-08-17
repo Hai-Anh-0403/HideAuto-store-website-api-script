@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardHead } from '../ui/Card'
+import { Pager } from '../ui/Pager'
 import { Pill } from '../ui/Pill'
 import { Empty, ErrorState, PendingApproval, TableSkeleton } from '../ui/States'
 import { useToast } from '../ui/Toast'
@@ -9,7 +11,9 @@ import { useErrorText } from '../lib/errors'
 import { fmtWhen, keyStatus } from '../lib/pills'
 import { useFetch } from '../lib/useFetch'
 import { useAuth } from '../store/auth'
-import type { KeyItem } from '../types'
+import type { KeyItem, Page } from '../types'
+
+const PAGE_SIZE = 20
 
 export function Keys() {
   const { seller } = useAuth()
@@ -18,12 +22,16 @@ export function Keys() {
   const approved = seller?.status === 'approved'
   const nav = useNavigate()
   const { toast } = useToast()
+  const [skip, setSkip] = useState(0)
 
   const keys = useFetch(
-    () => (approved ? api.get<KeyItem[]>('/sellers/me/keys') : Promise.resolve(null)),
-    `keys:${approved}`,
+    () =>
+      approved
+        ? api.get<Page<KeyItem>>(`/sellers/me/keys?skip=${skip}&limit=${PAGE_SIZE}`)
+        : Promise.resolve(null),
+    `keys:${approved}:${skip}`,
   )
-  const rows = keys.data ?? []
+  const rows = keys.data?.items ?? []
 
   const revoke = async (keyId: string) => {
     try {
@@ -49,7 +57,7 @@ export function Keys() {
 
       <Card>
         <CardHead
-          title={t('keys.count', { count: rows.length })}
+          title={t('keys.count', { count: keys.data?.total ?? 0 })}
           actions={
             <button className="btn pri sm" onClick={() => nav('/mini-apps')}>
               {t('keys.goToApps')}
@@ -124,6 +132,9 @@ export function Keys() {
               </tbody>
             </table>
           </div>
+        )}
+        {keys.data && (
+          <Pager skip={skip} limit={PAGE_SIZE} total={keys.data.total} onChange={setSkip} />
         )}
         <div className="card-foot">
           <span className="note">{t('keys.foot')}</span>

@@ -5,11 +5,12 @@ is gated on a redeemed key for that specific mini app.
 """
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 
 from app.api.deps import CurrentAppIdentity, CurrentAppUser
 from app.core.enums import DownloadFormat
+from app.core.rate_limit import rate_limit_activate
 from app.schemas.license import LicenseRead, LicenseRequest
 from app.schemas.script import ScriptRead
 from app.schemas.seller_member import MemberUsage
@@ -33,6 +34,7 @@ async def my_scripts(user: CurrentAppUser) -> list[ScriptRead]:
     "/app/scripts/{script_id}/license",
     response_model=LicenseRead,
     summary="Activate a packaged mini app (redeem a key) and get a signed licence",
+    dependencies=[Depends(rate_limit_activate)],
 )
 async def issue_license(
     script_id: PydanticObjectId, payload: LicenseRequest, identity: CurrentAppIdentity

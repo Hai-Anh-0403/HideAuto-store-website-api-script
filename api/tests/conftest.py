@@ -13,9 +13,11 @@ from mongomock_motor import AsyncMongoMockClient
 
 from app.core.config import settings
 from app.core.database import DOCUMENT_MODELS
+from app.core.rate_limit import reset_all as reset_rate_limits
 from app.core.security import hash_password
 from app.main import create_app
 from app.models.admin import Admin
+from app.services.flowdesk_client import close_client, init_client
 
 # Beanie calls list_collection_names(authorizedCollections=..., nameOnly=...); mongomock's
 # signature doesn't accept those kwargs — swallow unknown kwargs for the in-memory test DB.
@@ -30,6 +32,12 @@ mongomock.database.Database.list_collection_names = _list_collection_names  # ty
 
 ADMIN_EMAIL = "admin@teststore.com"
 ADMIN_PASSWORD = "admin12345"
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits() -> None:
+    """Clear rate-limit counters so tests don't interfere with each other."""
+    reset_rate_limits()
 
 
 @pytest.fixture(autouse=True)
@@ -62,7 +70,9 @@ async def app() -> AsyncIterator[FastAPI]:
     ).insert()
     # create_app() is used without its lifespan (ASGITransport skips it); Beanie is
     # already initialized above against the in-memory client.
+    await init_client()
     yield create_app()
+    await close_client()
 
 
 @pytest_asyncio.fixture

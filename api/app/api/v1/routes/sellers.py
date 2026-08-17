@@ -3,7 +3,7 @@
 from beanie import PydanticObjectId
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentAdmin, CurrentSeller, CurrentSellerCtx, Paginate
+from app.api.deps import ApprovedSeller, CurrentAdmin, CurrentSeller, CurrentSellerCtx, Paginate
 from app.core.enums import SellerStatus
 from app.schemas.common import Page
 from app.schemas.seller import (
@@ -13,7 +13,7 @@ from app.schemas.seller import (
     SellerReject,
     SellerUpdate,
 )
-from app.services import seller_service
+from app.services import seller_service, stats_service
 from app.utils.ids import require_id
 
 router = APIRouter(tags=["sellers"])
@@ -22,6 +22,11 @@ router = APIRouter(tags=["sellers"])
 @router.get("/sellers/me", response_model=SellerRead)
 async def get_me(seller: CurrentSeller) -> SellerRead:
     return SellerRead.model_validate(seller)
+
+
+@router.get("/sellers/me/stats", summary="Dashboard tile counts (scripts, members, keys)")
+async def get_stats(seller: ApprovedSeller) -> dict[str, int]:
+    return await stats_service.get_seller_stats(require_id(seller.id))
 
 
 @router.patch(

@@ -6,7 +6,14 @@ import { api } from '../lib/api'
 import { fmtWhen, isOnline } from '../lib/pills'
 import { useFetch } from '../lib/useFetch'
 import { useAuth } from '../store/auth'
-import type { KeyItem, Member, Page, Script } from '../types'
+import type { Member, Page } from '../types'
+
+interface SellerStats {
+  scripts_total: number
+  members_total: number
+  members_online: number
+  keys_active: number
+}
 
 export function Overview() {
   const { seller } = useAuth()
@@ -14,25 +21,17 @@ export function Overview() {
   const approved = seller?.status === 'approved'
   const key = `overview:${approved}`
 
-  const scripts = useFetch(
-    () => (approved ? api.get<Page<Script>>('/sellers/me/scripts?limit=100') : Promise.resolve(null)),
+  const stats = useFetch(
+    () => (approved ? api.get<SellerStats>('/sellers/me/stats') : Promise.resolve(null)),
     key,
   )
   const members = useFetch(
-    () => (approved ? api.get<Page<Member>>('/sellers/me/members?limit=100') : Promise.resolve(null)),
-    key,
-  )
-  const keys = useFetch(
-    () => (approved ? api.get<KeyItem[]>('/sellers/me/keys') : Promise.resolve(null)),
+    () => (approved ? api.get<Page<Member>>('/sellers/me/members?limit=8') : Promise.resolve(null)),
     key,
   )
 
   const memberItems = members.data?.items ?? []
-  const scriptItems = scripts.data?.items ?? []
-  const activeKeys = (keys.data ?? []).filter((k) => k.status === 'active').length
-  const online = memberItems.filter((m) => isOnline(m.last_seen_at)).length
-  const nameOf = (id: string) => scriptItems.find((s) => s.id === id)?.name ?? id
-  const error = scripts.error ?? members.error ?? keys.error
+  const error = stats.error ?? members.error
 
   return (
     <>
@@ -49,7 +48,7 @@ export function Overview() {
       <div className="tiles">
         <div className="tile">
           <div className="k">{t('overview.tile.members')}</div>
-          <div className="v tnum">{members.data?.total ?? 0}</div>
+          <div className="v tnum">{stats.data?.members_total ?? 0}</div>
           <div className="s">{t('overview.tile.membersSub')}</div>
         </div>
         <div className="tile">
@@ -57,18 +56,18 @@ export function Overview() {
             <span className="dot on" /> {t('overview.tile.online')}
           </div>
           <div className="v tnum" style={{ color: 'var(--success)' }}>
-            {online}
+            {stats.data?.members_online ?? 0}
           </div>
           <div className="s">{t('overview.tile.onlineSub')}</div>
         </div>
         <div className="tile">
           <div className="k">{t('overview.tile.keys')}</div>
-          <div className="v tnum">{activeKeys}</div>
+          <div className="v tnum">{stats.data?.keys_active ?? 0}</div>
           <div className="s">{t('overview.tile.keysSub')}</div>
         </div>
         <div className="tile">
           <div className="k">{t('overview.tile.apps')}</div>
-          <div className="v tnum">{scripts.data?.total ?? 0}</div>
+          <div className="v tnum">{stats.data?.scripts_total ?? 0}</div>
           <div className="s">{t('overview.tile.appsSub')}</div>
         </div>
       </div>
@@ -85,12 +84,11 @@ export function Overview() {
                   <th>{t('members.col.user')}</th>
                   <th>{t('members.col.status')}</th>
                   <th>{t('members.col.online')}</th>
-                  <th className="opt">{t('members.col.using')}</th>
                 </tr>
               </thead>
               <tbody>
                 {memberItems.length ? (
-                  memberItems.slice(0, 8).map((m) => (
+                  memberItems.map((m) => (
                     <tr key={m.id}>
                       <td>
                         <div className="u-main">{m.user_name ?? m.user_email ?? t('common.dash')}</div>
@@ -114,21 +112,11 @@ export function Overview() {
                           </Pill>
                         )}
                       </td>
-                      <td className="opt">
-                        <div className="chips">
-                          {m.all_scripts && <Pill tone="accent">{t('members.allApps')}</Pill>}
-                          {m.script_ids.map((id) => (
-                            <Pill key={id} tone="accent">
-                              {nameOf(id)}
-                            </Pill>
-                          ))}
-                        </div>
-                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="u-sub" style={{ padding: '18px 16px' }}>
+                    <td colSpan={3} className="u-sub" style={{ padding: '18px 16px' }}>
                       {t('overview.empty')}
                     </td>
                   </tr>

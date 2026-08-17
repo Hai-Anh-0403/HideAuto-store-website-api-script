@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Card, CardHead } from '../ui/Card'
+import { Pager } from '../ui/Pager'
 import { Pill } from '../ui/Pill'
 import { Empty, ErrorState, PendingApproval, TableSkeleton } from '../ui/States'
 import { useToast } from '../ui/Toast'
@@ -11,6 +12,8 @@ import { useFetch } from '../lib/useFetch'
 import { useAuth } from '../store/auth'
 import type { Member, Page, Script } from '../types'
 
+const PAGE_SIZE = 20
+
 export function Members() {
   const { seller } = useAuth()
   const { t, lang } = useI18n()
@@ -18,10 +21,14 @@ export function Members() {
   const approved = seller?.status === 'approved'
   const { toast } = useToast()
   const [q, setQ] = useState('')
+  const [skip, setSkip] = useState(0)
 
   const members = useFetch(
-    () => (approved ? api.get<Page<Member>>('/sellers/me/members?limit=100') : Promise.resolve(null)),
-    `members:${approved}`,
+    () =>
+      approved
+        ? api.get<Page<Member>>(`/sellers/me/members?skip=${skip}&limit=${PAGE_SIZE}`)
+        : Promise.resolve(null),
+    `members:${approved}:${skip}`,
   )
   const scripts = useFetch(
     () => (approved ? api.get<Page<Script>>('/sellers/me/scripts?limit=100') : Promise.resolve(null)),
@@ -148,6 +155,9 @@ export function Members() {
               </tbody>
             </table>
           </div>
+        )}
+        {members.data && (
+          <Pager skip={skip} limit={PAGE_SIZE} total={members.data.total} onChange={setSkip} />
         )}
         <div className="card-foot">
           <span className="note">{t('members.foot')}</span>

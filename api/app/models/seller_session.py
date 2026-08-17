@@ -27,5 +27,5 @@ class SellerSession(Document):
         indexes = [
             pymongo.IndexModel([("jti", pymongo.ASCENDING)], unique=True),
             pymongo.IndexModel([("seller_id", pymongo.ASCENDING)]),
-            pymongo.IndexModel([("expires_at", pymongo.ASCENDING)]),
+            pymongo.IndexModel([("expires_at", pymongo.ASCENDING)], expireAfterSeconds=0),
         ]

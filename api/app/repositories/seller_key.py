@@ -17,8 +17,13 @@ async def insert(key: SellerKey) -> SellerKey:
     return await key.insert()
 
 
-async def list_for_seller(seller_id: PydanticObjectId) -> list[SellerKey]:
-    return await SellerKey.find(SellerKey.seller_id == seller_id).sort("-created_at").to_list()
+async def list_for_seller(
+    seller_id: PydanticObjectId, *, skip: int = 0, limit: int = 100
+) -> tuple[list[SellerKey], int]:
+    query = SellerKey.find(SellerKey.seller_id == seller_id)
+    total = await query.count()
+    items = await query.sort("-created_at").skip(skip).limit(limit).to_list()
+    return items, total
 
 
 async def list_for_script(

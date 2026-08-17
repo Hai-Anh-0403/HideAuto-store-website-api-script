@@ -1,8 +1,9 @@
 """Auth routes: seller register/login + admin login."""
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
 from app.core.enums import Role
+from app.core.rate_limit import rate_limit_login
 from app.core.security import create_access_token
 from app.schemas.auth import LoginRequest, Token
 from app.schemas.seller import SellerRead, SellerRegister
@@ -19,7 +20,11 @@ async def register_seller(payload: SellerRegister) -> SellerRead:
     return SellerRead.model_validate(seller)
 
 
-@router.post("/sellers/login", response_model=Token)
+@router.post(
+    "/sellers/login",
+    response_model=Token,
+    dependencies=[Depends(rate_limit_login)],
+)
 async def login_seller(payload: LoginRequest, request: Request) -> Token:
     seller = await seller_service.authenticate(payload.email, payload.password)
     issued = create_access_token(subject_id=str(require_id(seller.id)), role=Role.SELLER)
@@ -28,7 +33,11 @@ async def login_seller(payload: LoginRequest, request: Request) -> Token:
     return Token(access_token=issued.token, role=Role.SELLER.value)
 
 
-@router.post("/admin/login", response_model=Token)
+@router.post(
+    "/admin/login",
+    response_model=Token,
+    dependencies=[Depends(rate_limit_login)],
+)
 async def login_admin(payload: LoginRequest) -> Token:
     admin = await admin_service.authenticate(payload.email, payload.password)
     issued = create_access_token(subject_id=str(require_id(admin.id)), role=Role.ADMIN)

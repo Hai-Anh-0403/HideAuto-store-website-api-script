@@ -59,8 +59,10 @@ async def create_script_key(
     return await create_key(seller_id, data, script=script)
 
 
-async def list_keys(seller_id: PydanticObjectId) -> list[SellerKey]:
-    return await key_repo.list_for_seller(seller_id)
+async def list_keys(
+    seller_id: PydanticObjectId, *, skip: int = 0, limit: int = 100
+) -> tuple[list[SellerKey], int]:
+    return await key_repo.list_for_seller(seller_id, skip=skip, limit=limit)
 
 
 async def list_script_keys(

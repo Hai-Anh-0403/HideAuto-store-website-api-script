@@ -10,6 +10,8 @@ from app.models.seller_member import SellerMember
 from app.schemas.seller_member import MemberDevice, MemberUsage
 from app.services import flowdesk_client
 
+# re-export: activation_service imports usage_from_member from here
+
 # A device is considered "online" if seen within this window.
 ONLINE_WINDOW_MINUTES = 5
 
@@ -65,18 +67,13 @@ def usage_from_member(member: SellerMember) -> MemberUsage:
 
 async def sync_usage_for_user(user_id: str, access_token: str) -> MemberUsage:
     """Fetch devices from flowdesk and cache them onto all of the user's memberships."""
-    from app.repositories import seller_member as member_repo
-
     devices = await flowdesk_client.get_devices(access_token)
     last_seen = latest_seen(devices)
     now = datetime.now(UTC)
 
-    members = await member_repo.list_by_user(user_id)
-    for member in members:
-        member.devices = devices
-        member.last_seen_at = last_seen
-        member.usage_synced_at = now
-        await member.save()
+    await SellerMember.find(SellerMember.user_id == user_id).update_many(
+        {"$set": {"devices": devices, "last_seen_at": last_seen, "usage_synced_at": now}}
+    )
 
     return MemberUsage(
         user_id=user_id,

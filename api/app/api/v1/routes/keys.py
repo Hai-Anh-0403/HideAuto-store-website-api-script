@@ -1,9 +1,11 @@
 """Key routes: seller issues/lists/revokes keys; end-user redeems a key."""
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
-from app.api.deps import ApprovedSeller, CurrentAppIdentity
+from app.api.deps import ApprovedSeller, CurrentAppIdentity, Paginate
+from app.core.rate_limit import rate_limit_redeem
+from app.schemas.common import Page
 from app.schemas.seller_key import KeyCreate, KeyRead, KeyRedeem
 from app.schemas.seller_member import MemberRead
 from app.services import key_service, usage_service
@@ -18,10 +20,17 @@ async def create_key(payload: KeyCreate, seller: ApprovedSeller) -> KeyRead:
     return KeyRead.model_validate(key)
 
 
-@router.get("/sellers/me/keys", response_model=list[KeyRead])
-async def list_keys(seller: ApprovedSeller) -> list[KeyRead]:
-    keys = await key_service.list_keys(require_id(seller.id))
-    return [KeyRead.model_validate(k) for k in keys]
+@router.get("/sellers/me/keys", response_model=Page[KeyRead])
+async def list_keys(seller: ApprovedSeller, page: Paginate) -> Page[KeyRead]:
+    keys, total = await key_service.list_keys(
+        require_id(seller.id), skip=page.skip, limit=page.limit
+    )
+    return Page(
+        items=[KeyRead.model_validate(k) for k in keys],
+        total=total,
+        skip=page.skip,
+        limit=page.limit,
+    )
 
 
 @router.post(
@@ -49,7 +58,12 @@ async def revoke_key(key_id: PydanticObjectId, seller: ApprovedSeller) -> KeyRea
     return KeyRead.model_validate(key)
 
 
-@router.post("/keys/redeem", response_model=MemberRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/keys/redeem",
+    response_model=MemberRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit_redeem)],
+)
 async def redeem_key(payload: KeyRedeem, identity: CurrentAppIdentity) -> MemberRead:
     """End-user (authenticated via flowdesk token) redeems a seller key."""
     member = await key_service.redeem_key(payload.key, identity.user)
