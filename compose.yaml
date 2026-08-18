@@ -1,60 +1,73 @@
 # Cả project trong 1 lệnh:
 #
-#   docker compose up -d --build     # chạy tất cả (Mongo + API + UI)
-#   docker compose logs -f api       # xem log
+#   docker compose up -d --build     # chạy tất cả (Postgres + server + web)
+#   docker compose logs -f server    # xem log
 #   docker compose stop              # tắt, giữ dữ liệu
 #   docker compose down -v           # xoá sạch cả dữ liệu
 #
-# UI: http://localhost:5173 · API/Swagger: http://localhost:8000/docs
-# Muốn hot reload khi code thì chạy native (xem README) — compose dùng bản build sẵn.
-name: store-hideflow
+# Web: http://localhost:3000 · API/Swagger: http://localhost:3001/docs
+# Muốn hot reload khi code thì chạy native: `pnpm install && pnpm dev`.
+name: store-autohide
 
 services:
-  mongo:
-    image: mongo:7
-    container_name: sah-mongo
+  postgres:
+    image: postgres:16-alpine
+    container_name: sah-postgres
     restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: store_autohide
     ports:
-      - "27017:27017"
+      - "5432:5432"
     volumes:
-      - mongo-data:/data/db
+      - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d store_autohide"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 10s
 
-  api:
-    build: ./api
-    container_name: sah-api
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: sah-server
     restart: unless-stopped
     depends_on:
-      mongo:
+      postgres:
         condition: service_healthy
-    # Secrets/admin seed đọc từ api/.env; các giá trị dưới đây ghi đè cho môi trường container.
-    env_file:
-      - ./api/.env
     environment:
-      MONGODB_URI: mongodb://mongo:27017
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/store_autohide
+      # Ghi đè bằng secret thật khi deploy — đừng dùng giá trị này ngoài máy local.
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: 7d
       STORAGE_DIR: /data/storage
-      MINI_APP_TEMPLATE_PATH: /data/mini-app-template.zip
+      PORT: 3001
     ports:
-      - "8000:8000"
+      - "3001:3001"
     volumes:
-      # api/var dùng chung với lúc chạy native: graph đã scrub nằm ở var/storage,
-      # template mini-app rỗng (tuỳ chọn) là var/mini-app-template.zip.
-      - ./api/var:/data
+      # Graph đã scrub + artifact build, giữ lại giữa các lần restart.
+      - server-storage:/data/storage
 
-  ui:
-    build: ./ui
-    container_name: sah-ui
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      # Build arg, not env: Next compiles the /api/* rewrite into the build output, so
+      # this has to be fixed at image build time.
+      args:
+        API_ORIGIN: http://server:3001
+    container_name: sah-web
     restart: unless-stopped
     depends_on:
-      - api
+      - server
     ports:
-      - "5173:80"
+      - "3000:3000"
 
 volumes:
-  mongo-data:
-    name: sah-mongo-data
+  pg-data:
+    name: sah-pg-data
+  server-storage:
+    name: sah-server-storage

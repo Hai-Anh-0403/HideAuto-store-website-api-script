@@ -1,0 +1,257 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth & Identity ────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  SELLER
+}
+
+enum SellerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("admins")
+}
+
+model Seller {
+  id        String       @id @default(cuid())
+  email     String       @unique
+  name      String
+  password  String
+  contact   String?
+  status    SellerStatus @default(PENDING)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  scripts  Script[]
+  keys     SellerKey[]
+  members  SellerMember[]
+  sessions SellerSession[]
+
+  @@map("sellers")
+}
+
+model SellerSession {
+  id         String   @id @default(cuid())
+  sellerId   String   @map("seller_id")
+  seller     Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  jti        String   @unique
+  device     String?
+  userAgent  String?  @map("user_agent")
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+  expiresAt  DateTime @map("expires_at")
+
+  @@map("seller_sessions")
+}
+
+// ─── Catalog ────────────────────────────────────────────────────────
+
+enum ScriptStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum ScriptVersionStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model Tag {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  color       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  scripts Script[] @relation("ScriptTags")
+
+  @@map("tags")
+}
+
+model Script {
+  id               String       @id @default(cuid())
+  slug             String       @unique
+  name             String
+  shortDescription String?      @map("short_description")
+  description      String?
+  sellerId         String       @map("seller_id")
+  seller           Seller       @relation(fields: [sellerId], references: [id])
+  sellerName       String       @map("seller_name")
+  engine           String       @default("hideflow")
+  hasMiniApp       Boolean      @default(false) @map("has_mini_app")
+
+  latestVersion   String?  @map("latest_version")
+  latestVersionId String?  @map("latest_version_id")
+  minAppVersion   String?  @map("min_app_version")
+  nodeCount       Int      @default(0) @map("node_count")
+  nodeGroupsUsed  String[] @default([]) @map("node_groups_used")
+  capabilities    Json     @default("{}") @db.JsonB
+
+  status       ScriptStatus @default(DRAFT)
+  rejectReason String?      @map("reject_reason")
+
+  ratingAvg   Float @default(0) @map("rating_avg")
+  ratingCount Int   @default(0) @map("rating_count")
+  downloads   Int   @default(0)
+  views       Int   @default(0)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  publishedAt DateTime? @map("published_at")
+
+  tags     Tag[]           @relation("ScriptTags")
+  versions ScriptVersion[]
+  keys     SellerKey[]
+  builds   MiniAppBuild[]
+
+  @@index([sellerId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([ratingAvg(sort: Desc)])
+  @@map("scripts")
+}
+
+model ScriptVersion {
+  id              String              @id @default(cuid())
+  scriptId        String              @map("script_id")
+  script          Script              @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  version         String
+  changelog       String?
+  fileUrl         String?             @map("file_url")
+  sourceFilename  String?             @map("source_filename")
+  sourceChecksum  String?             @map("source_checksum")
+  delivery        String              @default("graph_json")
+  formatVersion   Int                 @default(1) @map("format_version")
+  minAppVersion   String?             @map("min_app_version")
+  testedAppVersion String?            @map("tested_app_version")
+
+  graphExtracted  Boolean             @default(false) @map("graph_extracted")
+  nodeCount       Int                 @default(0) @map("node_count")
+  nodeGroupsUsed  String[]            @default([]) @map("node_groups_used")
+  usesControlFlow Boolean             @default(false) @map("uses_control_flow")
+  subWorkflowIds  String[]            @default([]) @map("sub_workflow_ids")
+  capabilities    Json                @default("{}") @db.JsonB
+  requiredVars    Json                @default("[]") @map("required_vars") @db.JsonB
+  scan            Json                @default("{}") @db.JsonB
+
+  appId   String? @map("app_id")
+  appName String? @map("app_name")
+
+  status     ScriptVersionStatus @default(PENDING_REVIEW)
+  reviewedBy String?             @map("reviewed_by")
+  reviewedAt DateTime?           @map("reviewed_at")
+  reviewNote String?             @map("review_note")
+  scannedAt  DateTime?           @map("scanned_at")
+  releasedAt DateTime?           @map("released_at")
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  @@unique([scriptId, version])
+  @@map("script_versions")
+}
+
+// ─── Keys & Members ─────────────────────────────────────────────────
+
+enum KeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum MemberStatus {
+  ACTIVE
+  BLOCKED
+}
+
+model SellerKey {
+  id        String    @id @default(cuid())
+  sellerId  String    @map("seller_id")
+  seller    Seller    @relation(fields: [sellerId], references: [id])
+  scriptId  String    @map("script_id")
+  script    Script    @relation(fields: [scriptId], references: [id])
+  key       String    @unique
+  label     String?
+  status    KeyStatus @default(ACTIVE)
+  maxUses   Int?      @map("max_uses")
+  usedCount Int       @default(0) @map("used_count")
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([sellerId])
+  @@index([scriptId])
+  @@map("seller_keys")
+}
+
+model SellerMember {
+  id             String       @id @default(cuid())
+  sellerId       String       @map("seller_id")
+  seller         Seller       @relation(fields: [sellerId], references: [id])
+  userId         String       @map("user_id")
+  userEmail      String?      @map("user_email")
+  userName       String?      @map("user_name")
+  status         MemberStatus @default(ACTIVE)
+  allScripts     Boolean      @default(false) @map("all_scripts")
+  lastSeenAt     DateTime?    @map("last_seen_at")
+  blockedDevices String[]     @default([]) @map("blocked_devices")
+  redeemedAt     DateTime     @default(now()) @map("redeemed_at")
+
+  scriptIds String[] @default([]) @map("script_ids")
+
+  @@unique([sellerId, userId])
+  @@index([sellerId])
+  @@map("seller_members")
+}
+
+// ─── Mini App Builds ────────────────────────────────────────────────
+
+enum BuildStatus {
+  BUILDING
+  READY
+  FAILED
+}
+
+model MiniAppBuild {
+  id              String      @id @default(cuid())
+  scriptId        String      @map("script_id")
+  script          Script      @relation(fields: [scriptId], references: [id])
+  scriptVersionId String      @map("script_version_id")
+  appId           String      @map("app_id")
+  appName         String      @map("app_name")
+  appVersion      String      @map("app_version")
+  platform        String      @default("win")
+  arch            String      @default("x64")
+  installerFormat String      @default("exe") @map("installer_format")
+  sizeBytes       Int         @default(0) @map("size_bytes")
+  checksum        String?
+  fileUrl         String?     @map("file_url")
+  status          BuildStatus @default(BUILDING)
+  builtBy         String      @default("server") @map("built_by")
+  error           String?
+  builtAt         DateTime?   @map("built_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  @@index([scriptId])
+  @@map("mini_app_builds")
+}

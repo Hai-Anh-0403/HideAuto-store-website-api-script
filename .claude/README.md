@@ -1,10 +1,10 @@
 # .claude — Project Configuration for storeAutoHide
 
-Configuration and agents for **storeAutoHide** — a FastAPI + MongoDB backend that sells
-**automation scripts** (`.hideflow` workflows) for the hideflow desktop app.
+Configuration and agents for **storeAutoHide** — a store that sells **automation scripts**
+(`.hideflow` workflows) for the hideflow desktop app.
 
-Stack: **Python 3.12+ · FastAPI · MongoDB (PyMongo async + Beanie) · Pydantic v2 · uv**.
-SQL (PostgreSQL) for users + transactions is planned but **not built yet**.
+Stack: **TypeScript monorepo (pnpm)** — **NestJS + Prisma + PostgreSQL** (`server/`) and
+**Next.js App Router + React 19** (`web/`).
 
 ---
 
@@ -14,9 +14,10 @@ SQL (PostgreSQL) for users + transactions is planned but **not built yet**.
 .claude/
 ├── agents/          # code review & analysis agents
 ├── commands/        # workflow commands
-├── rules/           # project coding rules (python.md, store-guardrails.md)
+├── rules/           # project coding rules (typescript.md, store-guardrails.md)
 ├── identity.json    # project metadata
-├── package-manager.json  # uv
+├── launch.json      # dev server config for the preview pane
+├── package-manager.json  # pnpm
 └── settings.local.json   # local settings
 ```
 
@@ -25,10 +26,10 @@ SQL (PostgreSQL) for users + transactions is planned but **not built yet**.
 ## 🚀 Commands
 
 ```bash
-# New resource/endpoint (FastAPI + Beanie)
+# New resource/endpoint (NestJS + Prisma, plus the Next.js page)
 /feature-development
 
-# MongoDB index change / data migration (Beanie)
+# PostgreSQL schema change / data migration (Prisma)
 /database-migration
 ```
 
@@ -36,14 +37,13 @@ SQL (PostgreSQL) for users + transactions is planned but **not built yet**.
 
 ## 🔧 Rules & Conventions
 
-- **`.claude/rules/python.md`** — Python/FastAPI/Beanie conventions, structure, security.
+- **`.claude/rules/typescript.md`** — TypeScript/NestJS/Next.js conventions, structure, security.
 - **`.claude/rules/store-guardrails.md`** — guardrails, commit workflow, architecture layering, review checklist.
 
 ### Identity (`identity.json`)
 - Project: storeAutoHide
-- Domains: python, fastapi, mongodb, beanie, rest-api
-- Package Manager: **uv**
-- Stack: Python + FastAPI + MongoDB (PyMongo async + Beanie) + Pydantic v2
+- Domains: typescript, nestjs, prisma, postgresql, nextjs, react, rest-api
+- Package Manager: **pnpm**
 
 ---
 
@@ -61,30 +61,29 @@ SQL (PostgreSQL) for users + transactions is planned but **not built yet**.
 | **performance-optimizer** | Query/runtime optimization |
 | **silent-failure-hunter** | Detect swallowed errors & silent failures |
 | **tdd-guide** | Test-driven development |
-| **database-reviewer** | SQL review (for the later Postgres user/transaction module) |
-| **build-error-resolver** | Resolve build/tooling errors |
-| **e2e-runner** | API end-to-end testing |
-
-> TS/React-specific agents were removed — this is a Python backend.
+| **database-reviewer** | PostgreSQL / Prisma query & schema review |
+| **build-error-resolver** | Resolve build/type errors |
+| **e2e-runner** | API & UI end-to-end testing |
 
 ---
 
 ## ⚙️ Config Files
 
 - **`identity.json`** — project metadata for Claude Code context.
-- **`package-manager.json`** — declares **uv**.
-- **`settings.local.json`** — local settings (e.g. allow `uv run *`).
+- **`package-manager.json`** — declares **pnpm**.
+- **`launch.json`** — `web-dev` dev server (port 3000) for the preview pane.
+- **`settings.local.json`** — local permission settings.
 
 ---
 
 ## 📚 Documentation
 
 - **CLAUDE.md** (project root) — quick reference & conventions
-- **docs/db/mongodb-catalog.md** — MongoDB catalog schema (now)
-- **docs/db/sql-schema.md** — SQL user/transaction schema (later)
-- **.claude/rules/python.md** — code rules
+- **server/prisma/schema.prisma** — database schema (source of truth)
+- **docs/script-publish-packaging.md** — upload → scrub → review → package flow
+- **.claude/rules/typescript.md** — code rules
 - **.claude/rules/store-guardrails.md** — guardrails
 
 ---
 
-**Project**: storeAutoHide (Python + FastAPI + MongoDB script marketplace API)
+**Project**: storeAutoHide (NestJS + Prisma + PostgreSQL · Next.js + TypeScript)

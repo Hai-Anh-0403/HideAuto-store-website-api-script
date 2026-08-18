@@ -8,13 +8,15 @@
     "explanations": true
   },
   "domains": [
-    "python",
-    "fastapi",
-    "mongodb",
-    "beanie",
+    "typescript",
+    "nestjs",
+    "prisma",
+    "postgresql",
+    "nextjs",
+    "react",
     "rest-api"
   ],
-  "stack": "Python + FastAPI + MongoDB (PyMongo async + Beanie ODM) + Pydantic v2 (REST API)",
-  "packageManager": "uv",
-  "updatedAt": "2026-08-09T00:00:00.000Z"
+  "stack": "TypeScript monorepo — NestJS + Prisma + PostgreSQL (server) · Next.js App Router + React 19 (web)",
+  "packageManager": "pnpm",
+  "updatedAt": "2026-08-18T00:00:00.000Z"
 }

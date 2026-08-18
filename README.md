@@ -4,101 +4,89 @@ Cửa hàng bán **mini app automation** (workflow `.hideflow`) cho app desktop 
 
 | Thư mục | Nội dung |
 |---|---|
-| [`api/`](./api) | FastAPI + MongoDB (Beanie) — REST API `/api/v1` |
-| [`ui/`](./ui) | React + Vite — cổng seller |
+| [`server/`](./server) | NestJS + Prisma + PostgreSQL — REST API `/api/v1` |
+| [`web/`](./web) | Next.js (App Router) + TypeScript — cổng seller |
 | [`docs/`](./docs) | Schema & luồng publish (nguồn sự thật) |
+
+Monorepo dùng **pnpm workspace**; hai package `server` và `web` cài chung một lần từ thư mục gốc.
 
 ---
 
 ## Chạy — 1 lệnh
 
-Chỉ cần **Docker**. Lệnh này dựng cả Mongo + API + UI:
+Chỉ cần **Docker**. Lệnh này dựng cả Postgres + server + web:
 
 ```bash
 docker compose up -d --build
 ```
 
-- UI: <http://localhost:5173>
-- API + Swagger: <http://localhost:8000/docs> (dùng để thao tác **admin**: duyệt seller, duyệt version)
+- Web: <http://localhost:3000>
+- API + Swagger: <http://localhost:3001/docs> (dùng để thao tác **admin**: duyệt seller, duyệt version)
 
 Lần sau chỉ cần `docker compose up -d` (thêm `--build` khi code đổi) · `docker compose stop` để tắt ·
-`docker compose logs -f api` xem log · `docker compose down -v` xoá sạch cả dữ liệu.
+`docker compose logs -f server` xem log · `docker compose down -v` xoá sạch cả dữ liệu.
 Chi tiết ở [compose.yaml](./compose.yaml).
 
-Trước lần chạy đầu: `cp api/.env.example api/.env`, rồi sửa `JWT_SECRET`, `INITIAL_ADMIN_EMAIL`,
-`INITIAL_ADMIN_PASSWORD` (admin được seed lúc khởi động nếu DB chưa có admin nào).
+Đặt `JWT_SECRET` thật trước khi deploy — giá trị mặc định trong compose chỉ dùng cho máy local.
 
 ---
 
 ## Chạy kiểu dev (hot reload)
 
-Cần thêm **Python 3.12+ với [uv]** và **Node 18+**. Mongo vẫn chạy bằng Docker:
+Cần **Node 22+** và **pnpm**. Postgres vẫn chạy bằng Docker:
 
 ```bash
-docker compose up -d mongo
+docker compose up -d postgres
 ```
 
 ```bash
-cd api && uv sync && uv run uvicorn app.main:app --reload
+pnpm install
+cp server/.env.example server/.env   # sửa JWT_SECRET, DATABASE_URL nếu cần
+pnpm db:push                         # tạo bảng từ prisma/schema.prisma
+pnpm db:seed                         # tag mặc định (+ admin nếu đặt ADMIN_EMAIL/ADMIN_PASSWORD)
+pnpm dev                             # chạy song song server (3001) + web (3000)
 ```
 
-```bash
-cd ui && npm install && npm run dev
-```
+Next rewrite `/api/*` → `http://localhost:3001`, không cần cấu hình CORS. Đổi origin bằng
+`API_ORIGIN` (xem [web/.env.example](./web/.env.example)).
 
-Vite proxy `/api` → `http://127.0.0.1:8000`, không cần cấu hình CORS. Hai cách chạy dùng chung
-MongoDB và chung thư mục artifact `api/var/`, nên đổi qua lại không mất dữ liệu.
+Chạy riêng: `pnpm dev:server` hoặc `pnpm dev:web`.
 
 ---
 
 ## Thử một vòng đầy đủ
 
-1. **UI** → tab *Đăng ký* → tạo seller. Với `SELLER_AUTO_APPROVE=true` (mặc định trong
-   `.env.example` là `false`) tài khoản **dùng được ngay**, vào thẳng portal.
-2. Nếu để `false`: **Swagger** → `POST /api/v1/admin/login` → lấy token → `Authorize` →
-   `GET /api/v1/admin/sellers?status=pending` → `POST /api/v1/admin/sellers/{id}/approve`.
-3. **UI** → đăng nhập seller → *Mini app của tôi* → **Tải mini app lên**
+1. **Web** → tab *Đăng ký* → tạo seller (trạng thái `PENDING`).
+2. **Swagger** → `POST /api/v1/auth/admin/login` → lấy token → `Authorize` →
+   `GET /api/v1/admin/sellers` → `PATCH /api/v1/admin/sellers/{id}/approve`.
+3. **Web** → đăng nhập seller → *Mini app của tôi* → **Tải mini app lên**
    (gói `.zip`/`.exe` của mini app, hoặc file `app.workflow` / graph `.json`).
-   Store tự tách graph, **xóa credential**, và suy ra node/khả năng/biến từ graph.
-4. **UI** → *Gửi duyệt*.
-5. **Swagger** → `POST /api/v1/admin/scripts/{id}/versions/{vid}/approve`.
-   Còn credential trong graph ⇒ trả **409**, seller phải xóa và tải lại.
-6. **UI** → tab *Khóa* → tạo khóa (mở đúng mini app đó) → tab *Đóng gói .zip* → **Đóng gói lại**.
-7. End-user (app hideflow, token flowdesk): `POST /api/v1/keys/redeem` → `GET /api/v1/app/scripts`
-   → `GET /api/v1/app/scripts/{id}/download?format=exe`.
-
-### Đóng gói lại `.zip`
-
-Bước 6 cần **template mini-app rỗng**: một bản hideflow đã đóng gói, **nén zip**, chưa có
-`resources/app.workflow`. Đặt file vào **`api/var/mini-app-template.zip`** — compose đã mount sẵn
-đường dẫn đó. Chạy native thì trỏ bằng env:
-
-```bash
-MINI_APP_TEMPLATE_PATH=api/var/mini-app-template.zip
-```
-
-Chưa có file thì API trả **503** kèm thông báo, và chỉ tải được graph
-(`?format=graph`). Server chỉ ghép file nên **không đổi được tên/icon `.exe`** —
-việc đó cần build agent Windows (`rcedit`), xem [docs](./docs/script-publish-packaging.md#4-đóng-gói-lại-repackage).
+   Store tự tách graph, **xoá credential**, và suy ra node/khả năng/biến từ graph.
+4. **Web** → *Gửi duyệt*.
+5. **Swagger** → `PATCH /api/v1/admin/scripts/versions/{vid}/approve`.
+   Còn credential trong graph ⇒ trả **409**, seller phải xoá và tải lại.
+6. **Web** → tab *Khóa* → tạo khóa (mở đúng mini app đó).
 
 ---
 
 ## Kiểm tra chất lượng
 
 ```bash
-cd api && uv run ruff check . && uv run mypy app && uv run pytest
+pnpm -r run build
 ```
 
 ```bash
-cd ui && npm run typecheck && npm run build
+cd server && npx tsc --noEmit && pnpm lint && pnpm test
+```
+
+```bash
+cd web && npx tsc --noEmit && pnpm lint
 ```
 
 ---
 
 ## Tài liệu
 
-- [docs/db/mongodb-catalog.md](./docs/db/mongodb-catalog.md) — schema MongoDB (catalog)
+- [server/prisma/schema.prisma](./server/prisma/schema.prisma) — schema PostgreSQL (nguồn sự thật)
 - [docs/script-publish-packaging.md](./docs/script-publish-packaging.md) — luồng upload → scrub → duyệt → đóng gói
 - [CLAUDE.md](./CLAUDE.md) — quy ước code
-
-[uv]: https://docs.astral.sh/uv/

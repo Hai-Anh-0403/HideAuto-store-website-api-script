@@ -1,18 +1,28 @@
-# Python (api/)
+# Node (server/, web/)
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+.vite/
+*.local
+
+# Env & secrets — only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# Prisma / runtime artifacts
+server/var/
+var/storage/
+
+# Python (legacy api/)
 .venv/
 __pycache__/
 *.pyc
-.env
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
 *.egg-info/
-
-# Node (ui/)
-node_modules/
-dist/
-.vite/
-*.local
 
 # OS / editor
 .DS_Store

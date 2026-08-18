@@ -2,8 +2,9 @@
 
 Quick reference for Claude Code and development conventions.
 
-**storeAutoHide** is a **web store backend** built with **Python + FastAPI** (REST API, JSON only)
-that sells **automation scripts** (`.hideflow` workflows) for the hideflow desktop app.
+**storeAutoHide** is a **web store** for **automation scripts** (`.hideflow` workflows) used by the
+hideflow desktop app. It is a **pnpm monorepo**: a **NestJS + Prisma + PostgreSQL** API (`server/`)
+and a **Next.js + TypeScript** seller portal (`web/`).
 
 ---
 
@@ -11,182 +12,167 @@ that sells **automation scripts** (`.hideflow` workflows) for the hideflow deskt
 
 - **Be careful and thorough.** Treat every change as if it ships to production.
 - **Always self-review after coding.** Re-read the diff end-to-end before declaring done — verify it solves the request, look for edge cases, broken imports, wrong types, unintended side effects.
-- **Verify before claiming success.** Run `uv run mypy app` and `uv run ruff check .` (and `uv run pytest` when relevant); never report a task finished on unverified code. If something is skipped or fails, say so plainly.
-- **Prefer reviewing existing similar code** before adding new patterns (routers, schemas, repositories, services).
-- **Keep the layers clean.** Routers stay thin (validation + delegation); business logic in `services/`; DB access in `repositories/`. Don't put Beanie/Mongo queries directly in route handlers.
-- **Pydantic is the API boundary.** Every request/response uses a Pydantic schema — never return raw Beanie documents or leak internal fields (secrets, embedded credentials) in responses.
-- **Async all the way.** DB and I/O are async (`async def`, `await`, PyMongo async/Beanie). Never block the event loop; offload CPU-bound work to a threadpool.
+- **Verify before claiming success.** Run `npx tsc --noEmit` in the package you touched, plus `pnpm lint` / `pnpm test` when relevant; never report a task finished on unverified code. If something is skipped or fails, say so plainly.
+- **Prefer reviewing existing similar code** before adding new patterns (controllers, DTOs, services, pages).
+- **Keep the layers clean.** Controllers stay thin (validation + delegation); business logic in `*.service.ts`; DB access through `PrismaService`. Don't put Prisma queries directly in controllers.
+- **DTOs are the API boundary.** Every request body/query uses a `class-validator` DTO — never accept raw input, never return fields that leak secrets.
+- **Async all the way.** Prisma and I/O are async. Never block the event loop; offload CPU-bound work.
 - **Stay skeptical of external reviews.** Re-verify any finding from another agent/plugin against the actual code before acting.
 
 ---
 
 ## 📋 Project Summary
 
-REST API backend for a **script marketplace**: sellers upload `.hideflow` automation workflows, the store validates/scrubs them and lists them for sale; buyers browse, review, and (later) purchase.
+REST API + seller portal for a **script marketplace**: sellers upload `.hideflow` automation
+workflows, the store validates/scrubs them and lists them for sale; buyers browse and redeem keys.
 
 ### Tech Stack
-- **Language**: Python 3.12+
-- **Framework**: FastAPI (ASGI)
-- **Server**: Uvicorn (dev) / Uvicorn workers behind a process manager (prod)
-- **Database (primary)**: **MongoDB** — catalog / marketplace content
-- **Driver / ODM**: **PyMongo async** (`AsyncMongoClient`) + **Beanie** (Pydantic v2 document ODM)
-- **Database (later)**: SQL (PostgreSQL) for **users + transactions** (auth, cart, orders, payments) — not built yet
-- **Validation/Serialization**: Pydantic v2 (+ `pydantic-settings` for config)
-- **Auth**: OAuth2 password flow + JWT (`python-jose`), password hashing (`bcrypt`)
-- **Package/Env Manager**: **uv**
-- **Testing**: pytest (+ `httpx.AsyncClient`, `pytest-asyncio`)
-- **Lint/Format**: Ruff — **Type Checking**: mypy
+- **Language**: TypeScript (strict) on Node 22+
+- **API**: NestJS 11 (Express platform), Swagger at `/docs`
+- **DB**: PostgreSQL via **Prisma 6** (`server/prisma/schema.prisma` is the source of truth)
+- **Frontend**: Next.js 15 App Router, React 19, plain CSS (`web/src/styles/`)
+- **Auth**: JWT (`@nestjs/jwt` + passport-jwt), password hashing with `bcrypt`
+- **Package manager**: **pnpm** (workspace at the repo root)
+- **Lint**: ESLint 9 flat config — **Typecheck**: `tsc --noEmit`
 
 ### Data model
-- **Schema docs are the source of truth**: [docs/db/mongodb-catalog.md](./docs/db/mongodb-catalog.md) (now) and [docs/db/sql-schema.md](./docs/db/sql-schema.md) (later).
-- **MongoDB (now)**: `categories`, `tags`, `scripts`, `script_versions`, `reviews`, `uploads`, `mini_app_builds`. **No payment/checkout here.**
-- **SQL (later)**: `users`, `carts`, `orders`, `entitlements` (payments/subscriptions only if needed).
-- **Cross-DB boundary**: Mongo stores `user_id`/`seller_id`/`owner_id` as string refs to SQL `users.id`; SQL stores `script_id` as the Mongo ObjectId hex. No hard FK across DBs; snapshot name/price into orders.
+- **Source of truth**: [server/prisma/schema.prisma](./server/prisma/schema.prisma).
+- Tables: `admins`, `sellers`, `seller_sessions`, `tags`, `scripts`, `script_versions`,
+  `seller_keys`, `seller_members`, `mini_app_builds`.
+- Prisma enums are **UPPERCASE** (`PENDING`, `PUBLISHED`, `ACTIVE`, …); the API returns Prisma's
+  **camelCase** field names. The frontend types in `web/src/types.ts` must mirror both exactly.
 
 ---
 
 ## 🚀 Quick Start
 
 ```bash
-# Install dependencies (creates .venv from pyproject.toml + uv.lock)
-uv sync
+pnpm install                  # install both packages from the repo root
 
-# Run dev server (hot reload)
-uv run uvicorn app.main:app --reload
+docker compose up -d postgres # or point DATABASE_URL at your own Postgres
+cp server/.env.example server/.env
 
-# Type check
-uv run mypy app
+pnpm db:push                  # apply schema.prisma to the database
+pnpm db:seed                  # baseline tags (+ admin if ADMIN_EMAIL/ADMIN_PASSWORD set)
+pnpm dev                      # server on :3001, web on :3000
 
-# Lint + format
-uv run ruff check .
-uv run ruff format .
-
-# Tests
-uv run pytest
-
-# MongoDB migrations / indexes (Beanie)
-uv run beanie migrate -uri "$MONGODB_URI" -db "$MONGODB_DB" -p migrations/
+pnpm -r run build             # build both packages
 ```
 
-Requires a running MongoDB (local `mongod`, Docker, or Atlas). Set `MONGODB_URI` / `MONGODB_DB` in `.env`.
+Per-package checks:
+
+```bash
+cd server && npx tsc --noEmit && pnpm lint && pnpm test
+cd web    && npx tsc --noEmit && pnpm lint
+```
+
+After editing `schema.prisma`, run `pnpm --filter server exec prisma generate` (or `pnpm db:push`,
+which generates too) so the Prisma client types update.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-app/
-├── main.py               # FastAPI factory: lifespan → PyMongo async client + init_beanie(document_models=[...])
-├── core/
-│   ├── config.py         # Settings via pydantic-settings (MONGODB_URI, MONGODB_DB, JWT_SECRET, ...)
-│   ├── database.py       # AsyncMongoClient, get_client(), init_beanie wiring
-│   └── security.py       # JWT create/decode, password hash/verify
-├── api/
-│   ├── deps.py           # shared dependencies: get_current_user, pagination
-│   └── v1/
-│       ├── router.py     # aggregates all v1 routers
-│       └── routes/       # scripts.py, categories.py, tags.py, reviews.py, uploads.py, mini_app_builds.py
-├── models/               # Beanie Documents (ODM): script.py, script_version.py, category.py, tag.py, review.py, upload.py, mini_app_build.py
-├── schemas/              # Pydantic request/response DTOs (Create/Update/Read)
-├── repositories/         # DB access layer (Beanie queries, one module per collection)
-├── services/             # business logic (script publish/validate, credential scrubbing, pricing)
-└── utils/                # cross-cutting helpers (e.g. .hideflow parse/scrub, graph scan)
+server/
+├── prisma/
+│   ├── schema.prisma      # DB schema — source of truth
+│   └── seed.ts            # idempotent dev seed (tags + optional admin)
+├── src/
+│   ├── main.ts            # bootstrap: global ValidationPipe, Swagger, CORS
+│   ├── app.module.ts      # registers every feature module
+│   ├── prisma/            # PrismaService (global)
+│   ├── storage/           # content-addressed artifact storage (global)
+│   ├── common/
+│   │   ├── dto/           # PaginationDto, PageDto
+│   │   └── graph/         # ⚠ domain-critical: .hideflow parse / scrub / derive
+│   ├── auth/              # login, register, JWT strategy, guards
+│   ├── sellers/ scripts/ tags/ keys/ members/ builds/ store/ admin/
+│   └── …                  # each: *.module.ts, *.controller.ts, *.service.ts, dto/
+└── test/                  # workflow-graph.test.ts (run via `pnpm test`)
 
-migrations/               # Beanie migration modules (data backfills / index changes)
-tests/
-├── conftest.py           # fixtures: app, async client, test Mongo (test DB or mongomock-motor)
-└── ...                   # test_scripts.py, test_reviews.py, ...
-
-pyproject.toml            # deps + tool config (ruff, mypy, pytest) — managed by uv
-uv.lock                   # locked dependency versions (commit this)
-.env.example              # documented env vars (never commit real .env)
+web/
+├── next.config.ts         # rewrites /api/* → API_ORIGIN
+└── src/
+    ├── app/               # App Router pages (login, portal/*)
+    ├── components/        # Pill, Pager, TagPicker, Toast, Brand
+    ├── lib/               # api client, auth context, useFetch, pills, errors
+    ├── i18n/              # en.ts / vi.ts
+    └── types.ts           # DTOs mirroring the API responses
 ```
 
 ---
 
 ## 🔧 Development Conventions
 
-### Code Style
+### NestJS
 
-Python 3.12+ with full type hints (strict-ish mypy; avoid untyped functions).
+- **One module per resource** under `src/<resource>/`, registered in `app.module.ts`.
+- Controllers carry the full path: `@Controller('api/v1/scripts')`. There is no global prefix.
+- Guard seller routes with `@UseGuards(JwtAuthGuard, SellerAuthGuard)`, admin routes with `AdminAuthGuard`.
+- **Always set `@ApiOperation`** and an explicit `@HttpCode` on write endpoints.
+- Errors via Nest's built-in exceptions (`NotFoundException`, `ConflictException`, …) — never ad-hoc error objects.
+- Config only through `ConfigService` (env-driven); no hardcoded secrets or URLs.
 
-```python
-# ✅ Good — typed, async, thin router delegating to a service
-@router.post("/scripts", response_model=ProductRead, status_code=201)
-async def publish_script(
-    payload: ScriptCreate,
-    user: CurrentUser = Depends(get_current_user),
-) -> ProductRead:
-    return await script_service.publish(user=user, data=payload)
+### DTOs & validation
 
-# ❌ Bad — no types, Beanie query in the handler, returns raw document
-@router.post("/scripts")
-async def publish_script(payload):
-    p = Product(**payload)
-    await p.insert()
-    return p
-```
+- `main.ts` runs `ValidationPipe` with `whitelist` + **`forbidNonWhitelisted: true`**: any field not
+  declared on the DTO makes the request **400**. Frontend payloads and DTOs must match exactly.
+- **Request DTOs use camelCase** (`shortDescription`, `tagIds`) to match the camelCase responses.
+  Multipart bodies arrive as strings, so list fields there are comma-separated (`tagIds: string`);
+  JSON bodies use real arrays (`tagIds: string[]`).
+- `tsconfig` sets `strictPropertyInitialization: false` so DTO classes need no initializers.
 
-**File & Naming**
-- Modules/files: `snake_case.py` (e.g. `script_service.py`, `script.py`)
-- Classes (Beanie documents, Pydantic schemas): `PascalCase` (`Product`, `ScriptCreate`)
-- Functions/variables: `snake_case`; constants: `UPPER_SNAKE_CASE`
-- One collection per model file.
+### Prisma
 
-**Imports**: absolute from the `app` package (`from app.services import script_service`).
+- Edit `schema.prisma` → `pnpm db:push` (dev) or `pnpm db:migrate` (versioned migration).
+- Query only inside services, through the injected `PrismaService`.
+- Use `select`/`include` deliberately and always paginate lists (`skip`/`take` + `PageDto`).
+- Never return the `password` column; select explicit fields on user-facing reads.
 
-### FastAPI Conventions
+### Next.js (web)
 
-- **Routers per resource** under `app/api/v1/routes/`, aggregated in `app/api/v1/router.py`, mounted in `main.py` with prefix `/api/v1`.
-- **Dependencies** (`Depends`) for auth and pagination — defined in `app/api/deps.py`.
-- **Always set `response_model`** and an explicit `status_code` on write endpoints.
-- **Raise `HTTPException`** (or mapped domain exceptions) for error paths — never return error dicts ad hoc.
-- Keep OpenAPI docs meaningful (clear summary/tags per route).
-
-### Pydantic (schemas)
-
-- Separate schemas for input vs output: `XxxCreate`, `XxxUpdate`, `XxxRead`.
-- `Read` schemas use `model_config = ConfigDict(from_attributes=True)` to serialize documents.
-- Never expose sensitive fields (embedded credentials, internal flags) in `Read` schemas.
-- Validate constraints in schemas (`Field(gt=0)`, `EmailStr`, enums) rather than in handlers.
-
-### MongoDB (Beanie / PyMongo async)
-
-- Models inherit `beanie.Document`; declare the collection name and indexes in the inner `Settings` class.
-- Access DB only through `repositories/` functions; keep queries out of routes/services where possible.
-- Use `Link`/manual refs deliberately; **cross-DB refs (user/seller) are plain strings**, not `Link`.
-- Prefer explicit projections and pagination (`.find(...).skip().limit()`); avoid loading whole collections.
-- **Schema is enforced in code, not the DB** — validate everything with Pydantic/Beanie before insert.
+- Pages are **client components** (`'use client'`) that fetch through `src/lib/api.ts`.
+- The browser always calls same-origin `/api/*`; `next.config.ts` proxies to the API.
+- Use `useFetch(loader, key)` for reads — `loading` is derived from the settled key, so never call
+  `setState` synchronously inside an effect (the React 19 lint rules enforce this).
+- Status → badge mapping lives in `src/lib/pills.ts`, keyed by the **UPPERCASE** enum values.
+- Every user-facing string goes through `t(...)` and **must exist in both `en.ts` and `vi.ts`** —
+  a missing key renders raw.
 
 ### Script publish/validate (domain-critical)
 
-- On upload, **parse the `.hideflow` graph**, **scrub embedded credentials** (block publish if any remain), and **derive metadata by scanning the graph** (node_count, capabilities, required_variables) — never trust seller-supplied metadata. Flag `uses_shell` (runCommand). See [docs/db/mongodb-catalog.md](./docs/db/mongodb-catalog.md) → "Script — quy tắc publish & validate".
+`server/src/common/graph/` is the heart of the store and mirrors the desktop app's own rules:
 
-### Configuration
+- `package-extract.ts` — pull the graph out of a `.zip`/`.exe`/`.json` upload. Archives are treated
+  as hostile: entry names validated (zip-slip), entry count and size capped. Encrypted `.hideflow`
+  exports are rejected; an unreadable `.exe` is accepted as an *opaque* build with `graphExtracted: false`.
+- `workflow-graph.ts` — `scrubCredentials()` blanks every embedded secret (node config **and**
+  `variables[]`) and reports **paths only, never values**; `deriveMetadata()` reads node count,
+  groups, capabilities and required variables **out of the graph**.
 
-- All config via `app/core/config.py` (`pydantic-settings`), read from environment / `.env`.
-- Never hardcode secrets, DB URIs, or JWT keys. Document every var in `.env.example`.
+Rules that must hold:
 
-### Errors & Logging
+- **Only the scrubbed graph is persisted** — the original upload bytes are never stored.
+- **Metadata is derived, never trusted** from seller input.
+- **A version with `embedded_credentials_count > 0` can never be approved** (409 in `admin.service.ts`).
+- `uses_shell` (the `runCommand` node) is surfaced prominently.
 
-- Use the standard `logging` module (configured centrally) — no `print()` in application code.
-- Log errors with context; don't swallow exceptions silently.
+Changing this logic **requires** updating `server/test/workflow-graph.test.ts` and running `pnpm test`.
 
 ---
 
 ## 🎯 Adding a New Resource / Endpoint
 
-Example: add a "Bundle" (collection of scripts) resource.
+Example: add a "Bundle" resource.
 
-1. **Model** — `app/models/bundle.py` (Beanie `Bundle(Document)` + `Settings` collection/indexes).
-2. **Register** the document in `init_beanie(document_models=[...])` (in `app/core/database.py` / `main.py` lifespan).
-3. **Schemas** — `app/schemas/bundle.py`: `BundleCreate`, `BundleUpdate`, `BundleRead`.
-4. **Repository** — `app/repositories/bundle.py`: async Beanie queries.
-5. **Service** (if logic) — `app/services/bundle_service.py`: validation, business rules.
-6. **Router** — `app/api/v1/routes/bundles.py`, include it in `app/api/v1/router.py`.
-7. **Indexes / migration** — declare indexes in `Settings`; add a Beanie migration in `migrations/` for backfills.
-8. **Tests** — `tests/test_bundles.py`.
-9. **Verify** — `uv run mypy app`, `uv run ruff check .`, `uv run pytest`.
+1. **Schema** — add the model to `prisma/schema.prisma`, then `pnpm db:push`.
+2. **DTOs** — `server/src/bundles/dto/`: `create-bundle.dto.ts`, `update-bundle.dto.ts` (camelCase fields).
+3. **Service** — `bundles.service.ts`: Prisma queries + business rules.
+4. **Controller** — `bundles.controller.ts` with `@Controller('api/v1/bundles')`, guards, `@ApiOperation`.
+5. **Module** — `bundles.module.ts`, registered in `app.module.ts`.
+6. **Frontend** — add the response shape to `web/src/types.ts`, then the page/call.
+7. **Verify** — `npx tsc --noEmit` in both packages, `pnpm lint`, `pnpm test`.
 
 ---
 
@@ -197,18 +183,17 @@ Use **conventional commits**:
 ```bash
 git commit -m "feat: add script publish endpoint"
 git commit -m "fix: scrub embedded credentials before listing"
-git commit -m "refactor: extract graph scan into service"
-git commit -m "test: add review creation tests"
-git commit -m "chore: bump beanie"
+git commit -m "refactor: extract graph scan into a helper"
+git commit -m "test: cover credential scrubbing"
+git commit -m "chore: bump prisma"
 ```
 
 **Before committing:**
 
 ```bash
-uv run ruff format .
-uv run ruff check .
-uv run mypy app
-uv run pytest
+pnpm -r run build
+cd server && npx tsc --noEmit && pnpm lint && pnpm test
+cd web    && npx tsc --noEmit && pnpm lint
 ```
 
 Branch naming: `feat/script-publish`, `fix/credential-scrub`, `docs/db-schema`.
@@ -219,41 +204,50 @@ Branch naming: `feat/script-publish`, `fix/credential-scrub`, `docs/db-schema`.
 
 | File | Purpose |
 |------|---------|
-| `app/main.py` | FastAPI factory + lifespan (PyMongo async client, `init_beanie`) |
-| `app/core/config.py` | Settings (env-driven, pydantic-settings) |
-| `app/core/database.py` | PyMongo async client + Beanie init |
-| `app/core/security.py` | JWT + password hashing |
-| `app/api/deps.py` | Shared dependencies (`get_current_user`, pagination) |
-| `app/api/v1/router.py` | Aggregates all v1 routers |
-| `docs/db/mongodb-catalog.md` | MongoDB catalog schema (source of truth, now) |
-| `docs/db/sql-schema.md` | SQL user/transaction schema (source of truth, later) |
-| `pyproject.toml` | Deps + tool config (ruff, mypy, pytest) |
+| `server/prisma/schema.prisma` | DB schema (source of truth) |
+| `server/src/main.ts` | Bootstrap: ValidationPipe, Swagger, CORS |
+| `server/src/app.module.ts` | Module registry |
+| `server/src/common/graph/workflow-graph.ts` | Credential scrubbing + metadata derivation |
+| `server/src/common/graph/package-extract.ts` | Upload → graph extraction |
+| `server/src/storage/storage.service.ts` | Content-addressed artifact storage |
+| `server/src/auth/` | JWT auth, guards, sessions |
+| `web/src/types.ts` | Frontend DTOs mirroring API responses |
+| `web/src/lib/api.ts` | Fetch wrapper + token handling |
+| `web/src/lib/pills.ts` | Status → badge mapping (UPPERCASE keys) |
 
 ---
 
 ## ⚠️ Important Notes
 
-- **No secrets in code**: DB URI, JWT secret, payment keys → env only (`.env`, never committed).
-- **Never list a script with real secrets**: publish flow must scrub embedded credentials (block if `embedded_credentials_count > 0`).
-- **Derive script metadata from the graph**, don't trust seller input; surface `uses_shell` prominently.
-- **Pydantic at the boundary**: validate all input, shape all output; never leak document internals.
-- **Async safety**: no blocking calls in async handlers; use a threadpool for CPU-bound work.
-- **Cross-DB refs are strings**, not hard FKs; users/transactions live in SQL (later).
-- **Commit `uv.lock`** so environments are reproducible.
+- **No secrets in code**: `DATABASE_URL`, `JWT_SECRET` → env only. Document every var in `.env.example`.
+- **Never list a script with real secrets**: uploads are scrubbed, and approval is blocked while
+  `embedded_credentials_count > 0`.
+- **Derive script metadata from the graph**, don't trust seller input; surface `uses_shell`.
+- **`forbidNonWhitelisted` is on**: an undeclared field in a request body is a 400, not a silent ignore.
+- **Enums are UPPERCASE, fields are camelCase** — keep `web/src/types.ts` in sync with Prisma.
+- **Commit `pnpm-lock.yaml`** so environments are reproducible.
 
 ---
 
-## 📚 Documentation
+## 🧭 Legacy
 
-- **[docs/db/mongodb-catalog.md](./docs/db/mongodb-catalog.md)** — MongoDB catalog schema (now)
-- **[docs/db/sql-schema.md](./docs/db/sql-schema.md)** — SQL user/transaction schema (later)
-- **[docs/script-publish-packaging.md](./docs/script-publish-packaging.md)** — upload → publish → repackage flow
-- **[docs/mini-app-licensing.md](./docs/mini-app-licensing.md)** — key → signed licence → mini-app activation (+ the two identity systems)
-- **[.claude/rules/python.md](./.claude/rules/python.md)** — Python/FastAPI code rules
-- **[.claude/rules/store-guardrails.md](./.claude/rules/store-guardrails.md)** — Project guardrails
-- FastAPI interactive docs at `/docs` (Swagger) and `/redoc` when the server is running.
+The pre-rewrite stack — `api/` (Python + FastAPI + MongoDB) and `ui/` (React + Vite) — has been
+**removed**. It is still in git history if you need it:
+
+```bash
+git log --oneline -- api ui      # last state: "chore: checkpoint legacy api/ui before removal"
+git show <commit>:api/app/services/script_service.py
+```
+
+Two features from the old stack were **never ported**, and the docs that describe them are specs,
+not descriptions of running code:
+
+- **End-user app client** (`/app/*` — heartbeat, entitlements, Ed25519 signed licences, buyer
+  download) — see [docs/mini-app-licensing.md](./docs/mini-app-licensing.md).
+- **Real mini-app repackaging** — `POST /scripts/:scriptId/builds` records a build row without
+  producing an installer artifact.
 
 ---
 
-**Last updated**: 2026-08-09
-**Project**: storeAutoHide (Python + FastAPI + MongoDB script marketplace API)
+**Last updated**: 2026-08-18
+**Project**: storeAutoHide (NestJS + Prisma + PostgreSQL · Next.js + TypeScript)

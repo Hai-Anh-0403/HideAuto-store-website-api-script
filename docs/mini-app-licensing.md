@@ -2,13 +2,16 @@
 
 Tài liệu cho luồng **seller phát key → buyer nhập key trong mini app → mini app chạy được**.
 Phần đóng gói/publish: [script-publish-packaging.md](./script-publish-packaging.md). Data model:
-[db/mongodb-catalog.md](./db/mongodb-catalog.md).
+[server/prisma/schema.prisma](../server/prisma/schema.prisma).
 
 > **Tóm tắt 1 dòng**: store ký một **licence Ed25519** gắn với (mini app, user, máy); gói mini app
 > mang sẵn public key và tự kiểm licence lúc mở, hết hạn thì hỏi lại store.
 
-**Trạng thái**: phía store **đã code xong** (§3–§5). Cổng nhập key trong mini app **chưa làm** —
-nằm ở repo `desktop-app-workflow`, xem §6.
+> ⚠️ **Trạng thái sau khi chuyển sang NestJS: đây là SPEC, chưa có code.**
+> Bản Python cũ từng làm xong §3–§5, nhưng phần đó **chưa được port** (xem `git log -- api`).
+> Server hiện tại **chưa có** `/app/*` (heartbeat, entitlement, licence ký Ed25519, buyer download).
+> Seller phát key thì đã chạy (`/api/v1/keys`). Cổng nhập key trong mini app ở repo
+> `desktop-app-workflow`, xem §6.
 
 ---
 
@@ -18,12 +21,12 @@ Chỗ này gây nhầm nhiều nhất, ghi lại cho rõ:
 
 | | Seller (portal store) | End-user (app + mini app) |
 |---|---|---|
-| Kho user | Mongo `sellers` của store | flowdesk (`flowdesk.hachitechsolution.com/api`) |
-| Đăng nhập | `POST /api/v1/sellers/login` → JWT của store | `POST /api/auth/login` → access + refresh của flowdesk |
-| Mật khẩu | bcrypt trong Mongo | do flowdesk giữ |
+| Kho user | Postgres `sellers` của store | flowdesk (`flowdesk.hachitechsolution.com/api`) |
+| Đăng nhập | `POST /api/v1/auth/login` → JWT của store | `POST /api/auth/login` → access + refresh của flowdesk |
+| Mật khẩu | bcrypt trong Postgres | do flowdesk giữ |
 
 Store **không bao giờ** tạo hay xác thực tài khoản flowdesk; nó chỉ **kiểm tra token** người mua
-đưa lên (`GET /users/me`, `GET /devices` — [`flowdesk_client.py`](../api/app/services/flowdesk_client.py)).
+đưa lên (`GET /users/me`, `GET /devices` — cũ: `flowdesk_client.py`, chưa port sang NestJS).
 
 ⇒ Đăng ký seller ở store **không** sinh ra tài khoản bên app. Cùng một email vẫn là hai bản ghi,
 hai mật khẩu. Muốn kích hoạt mini app, buyer **phải có tài khoản app** (đăng nhập trong chính mini app).
@@ -71,8 +74,8 @@ Lúc đóng gói lại (`create_build`), store ghi thêm khối `store` vào `re
 - Chưa đặt `LICENSE_SIGNING_KEY` ⇒ store **không** nhét khối này, ghi log cảnh báo, gói mở tự do.
 - Chỉ **public key** đi vào gói. Seed ký nằm ở env của store.
 
-Code: [`mini_app_builder.build_store_block`](../api/app/utils/mini_app_builder.py),
-gọi từ [`mini_app_service._store_block`](../api/app/services/mini_app_service.py).
+Code cũ (Python, chưa port): `mini_app_builder.build_store_block`, gọi từ
+`mini_app_service._store_block`.
 
 ---
 
@@ -88,7 +91,7 @@ gọi từ [`mini_app_service._store_block`](../api/app/services/mini_app_servic
 { "payload_b64": "eyJhcHBf…", "signature": "base64…", "algorithm": "Ed25519" }
 ```
 
-Store làm tuần tự ([`activation_service.activate`](../api/app/services/activation_service.py)):
+Store làm tuần tự (code cũ `activation_service.activate`, chưa port):
 script tồn tại & `published` → redeem key nếu có → membership `active` + app nằm trong entitlement →
 `machine_id` không nằm trong `blocked_devices` → ký licence. Nhân tiện đồng bộ usage (best-effort)
 để seller thấy buyer vừa hoạt động.
@@ -125,7 +128,7 @@ script tồn tại & `published` → redeem key nếu có → membership `active
 > và chữ ký "sai" oan. Luôn verify trên **chuỗi byte nhận được**, parse sau.
 > (Có test cho ca này: `tests/test_mini_app_license.py`.)
 
-Code: [`license_service.py`](../api/app/services/license_service.py).
+Code cũ (Python, chưa port): `license_service.py`.
 
 ---
 
@@ -166,13 +169,13 @@ Checklist:
 |---|---|---|
 | `LICENSE_SIGNING_KEY` | trống | base64 seed Ed25519 (32 byte). Trống = **không có cổng key** |
 | `LICENSE_TTL_DAYS` | `7` | hạn licence = thời gian offline = độ trễ thu hồi |
-| `STORE_PUBLIC_URL` | `http://localhost:8000` | URL nhúng vào gói — buyer phải gọi tới được |
+| `STORE_PUBLIC_URL` | `http://localhost:3001` | URL nhúng vào gói — buyer phải gọi tới được |
 | `MINI_APP_TEMPLATE_PATH` | trống | gói mini app rỗng để inject; trống thì chỉ tải được graph |
 
 Sinh cặp khóa:
 
 ```bash
-uv run python scripts/gen_license_key.py
+node -e "const{generateKeyPairSync}=require('crypto');const{privateKey}=generateKeyPairSync('ed25519');console.log(privateKey.export({format:'der',type:'pkcs8'}).subarray(16).toString('base64'))"
 ```
 
 **Xoay khóa làm hỏng mọi gói đã phát hành** (chúng mang public key cũ) — buyer phải tải lại.

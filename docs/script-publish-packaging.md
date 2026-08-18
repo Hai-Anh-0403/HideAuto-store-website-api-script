@@ -1,11 +1,15 @@
 # Script Publish & Mini-app Packaging
 
 Tài liệu chi tiết cho luồng **seller đăng script → store tách/validate → buyer tải (đóng gói lại)**.
-Nguồn sự thật về data: [db/mongodb-catalog.md](./db/mongodb-catalog.md). Cơ chế mini-app tham chiếu code app
+Nguồn sự thật về data: [server/prisma/schema.prisma](../server/prisma/schema.prisma). Cơ chế mini-app tham chiếu code app
 `desktop-app-workflow/src/main/mini-app/mini-app-build-service.ts`.
 
 > **Tóm tắt 1 dòng**: seller upload **gói mini-app `.exe`/`.zip`** (hoặc `.hideflow`) → store **tách workflow graph**
 > ra → **scrub credential + derive metadata** → lưu & duyệt → khi buyer tải, store **đóng gói lại** `.exe`.
+
+> **Trạng thái**: upload → tách graph → scrub → derive → duyệt **đã chạy** trên server NestJS
+> (`server/src/common/graph/`, gate 409 khi còn credential). **Đóng gói lại `.exe` chưa port** —
+> `POST /scripts/:scriptId/builds` mới chỉ ghi bản ghi build, chưa sinh installer.
 
 ---
 
@@ -137,7 +141,7 @@ Store **không giữ mãi file .exe khổng lồ**; nó giữ **graph nhỏ** r�
 ---
 
 ## 5. Ánh xạ data model
-Chi tiết trường: [db/mongodb-catalog.md](./db/mongodb-catalog.md).
+Chi tiết trường: [server/prisma/schema.prisma](../server/prisma/schema.prisma).
 
 | Collection | Vai trò trong luồng này |
 |---|---|
@@ -150,7 +154,7 @@ Chi tiết trường: [db/mongodb-catalog.md](./db/mongodb-catalog.md).
 
 ## 6. Endpoint
 
-Đã code (`api/app/api/v1/routes/scripts.py`, prefix `/api/v1`):
+Đã code (`server/src/scripts/scripts.controller.ts`, prefix `/api/v1`):
 
 | Method · Path | Việc |
 |---|---|

@@ -12,7 +12,9 @@
 ## Domain
 
 - Store sells **automation scripts** (`.hideflow` workflow graphs) for the hideflow desktop app.
-- **Uploaded scripts are untrusted**: parse server-side, scrub embedded credentials, derive metadata from the graph, and flag shell usage (`runCommand`). Never publish a listing that still contains real secrets.
+- **Uploaded scripts are untrusted**: parse server-side, treat archives as hostile, scrub embedded
+  credentials, derive metadata from the graph, and flag shell usage (`runCommand`). Never publish a
+  listing that still contains real secrets.
 
 ## Commit Workflow
 
@@ -22,38 +24,45 @@
 
 ## Architecture
 
-- **Layering**: routers (thin) → services (business logic) → repositories (DB access) → models (Beanie documents)
-- **API boundary**: Pydantic schemas for all input/output; never return raw documents
-- **Config**: env-driven via `pydantic-settings`; no hardcoded secrets or DB URIs
-- **Database (primary)**: MongoDB via PyMongo async + Beanie ODM (catalog content)
-- **Database (later)**: SQL for users + transactions; cross-DB refs are plain string ids (no hard FK)
-- **Versioning**: routes live under `/api/v1`
+- **Monorepo**: pnpm workspace — `server/` (NestJS API) and `web/` (Next.js portal)
+- **Layering**: controllers (thin) → services (business logic) → `PrismaService` (DB access)
+- **API boundary**: `class-validator` DTOs for all input; never return raw rows with secret columns
+- **Config**: env-driven via `ConfigService`; no hardcoded secrets or DB URLs
+- **Database**: PostgreSQL via Prisma; `server/prisma/schema.prisma` is the source of truth
+- **Versioning**: routes live under `/api/v1` (declared on each `@Controller`)
 
 ## Code Style
 
-- **File naming**: `snake_case.py` (e.g. `script_service.py`, `script.py`)
-- **Classes**: `PascalCase` (Beanie documents, Pydantic schemas)
-- **Functions/vars**: `snake_case`; **constants**: `UPPER_SNAKE_CASE`
-- **Imports**: absolute from the `app` package
-- **Types**: full type hints; no `Any` without justification
-- **Async**: no blocking I/O in async paths
+- **Files**: `kebab-case.ts` (`script_service` → `scripts.service.ts`); React components `PascalCase.tsx`
+- **Classes**: `PascalCase` · **Functions/vars**: `camelCase` · **Constants**: `UPPER_SNAKE_CASE`
+- **Types**: full type hints; no `any` without justification (`unknown` + narrowing for untrusted data)
+- **Async**: no blocking I/O in request paths
+- **Naming across the wire**: Prisma enums are UPPERCASE, fields are camelCase — mirror both in `web/src/types.ts`
 
 ## Build & Test
 
-- **Install**: `uv sync`
-- **Dev**: `uv run uvicorn app.main:app --reload`
-- **Typecheck**: `uv run mypy app` (required before commit)
-- **Lint**: `uv run ruff check .`
-- **Format**: `uv run ruff format .`
-- **Test**: `uv run pytest`
-- **Mongo migrations/indexes**: `uv run beanie migrate -uri "$MONGODB_URI" -db "$MONGODB_DB" -p migrations/`
+- **Install**: `pnpm install`
+- **Dev**: `pnpm dev` (server :3001, web :3000)
+- **Typecheck**: `npx tsc --noEmit` per package (required before commit)
+- **Lint**: `pnpm lint`
+- **Test**: `pnpm test` (server)
+- **Build**: `pnpm -r run build`
+- **DB**: `pnpm db:push` · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:studio`
 
 ## Review Reminders
 
-- Type check passes (`uv run mypy app`)
-- Endpoints declare `response_model` + `status_code`; secrets / embedded credentials not exposed
-- DB access confined to `repositories/`; business logic in `services/`
-- Beanie documents register in `init_beanie`; indexes declared in `Settings`
-- Uploaded scripts scrubbed + metadata derived from graph (not trusted from seller)
+- Typecheck, lint, test and build all pass
+- Endpoints declare `@ApiOperation` + explicit `@HttpCode`; secrets / embedded credentials not exposed
+- DB access confined to services; business logic out of controllers
+- Request DTOs match the frontend payload exactly (`forbidNonWhitelisted` turns a stray field into a 400)
+- Uploaded scripts scrubbed + metadata derived from the graph (not trusted from the seller)
+- Approval blocked while `embedded_credentials_count > 0`
+- Ownership checked on seller-scoped queries (`where: { id, sellerId }`)
 - No secrets committed; env vars documented in `.env.example`
-- No `print()` in application code (use `logging`)
+- No `console.log` left in server request paths (use Nest's `Logger`)
+
+## Legacy
+
+The pre-rewrite stack (`api/` Python/FastAPI/MongoDB, `ui/` React/Vite) has been **removed** — recover
+it from git history if needed (`git log --oneline -- api ui`). Never ported: the end-user app client
+(`/app/*`) and real mini-app repackaging; the docs describing those are specs, not running code.
