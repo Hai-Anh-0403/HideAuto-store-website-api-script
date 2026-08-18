@@ -40,6 +40,7 @@ class ScriptCreate(BaseModel):
     name: str | None = Field(default=None, min_length=3, max_length=120)
     short_description: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=20_000)
+    tag_ids: list[PydanticObjectId] = Field(default_factory=list)
     version: str = Field(default="1.0.0", pattern=SEMVER_PATTERN)
     changelog: str | None = Field(default=None, max_length=2_000)
     min_app_version: str | None = Field(default=None, pattern=SEMVER_PATTERN)
@@ -55,6 +56,7 @@ class ScriptUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=3, max_length=120)
     short_description: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=20_000)
+    tag_ids: list[PydanticObjectId] | None = None
 
 
 class ScriptVersionCreate(BaseModel):
@@ -100,6 +102,7 @@ class ScriptRead(BaseModel):
     name: str
     short_description: str | None
     description: str | None
+    tag_ids: list[PydanticObjectId]
     seller: SellerRefRead
     engine: str
     status: ScriptStatus

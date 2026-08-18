@@ -215,7 +215,48 @@ textarea.input { height: auto; min-height: 84px; padding: 8px 10px; line-height:
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 10px 16px; border-top: 1px solid var(--border);
 }
-.pager-btns { display: flex; gap: 8px; }
+.pager-btns { display: flex; gap: 8px; align-items: center; }
+.pager-input {
+  width: 40px; text-align: center; padding: 3px 4px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg); color: var(--text); font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.pager-input:focus { border-color: var(--accent); outline: none; }
+/* Tag picker — chip-based multi-select */
+.tagpicker { position: relative; }
+.tagpicker-chips {
+  display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
+  min-height: 32px; border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: var(--radius-md); padding: 4px 8px; cursor: pointer;
+}
+.tagpicker-chips:hover { border-color: var(--border-strong); }
+.tagpicker-placeholder { color: var(--text-muted); font-size: 12.5px; }
+.tagchip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 500; padding: 1px 8px;
+  border-radius: var(--radius-sm); white-space: nowrap;
+  background: var(--brand-tint); color: var(--brand);
+}
+.tagchip-x {
+  border: 0; background: none; color: inherit; font-size: 13px;
+  padding: 0; margin: 0 -2px 0 1px; cursor: pointer; line-height: 1; opacity: 0.7;
+}
+.tagchip-x:hover { opacity: 1; }
+.tagpicker-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-3);
+  max-height: 180px; overflow-y: auto; z-index: 10;
+}
+.tagpicker-option {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: 0; background: none; color: var(--text-primary);
+  font-size: 12.5px; padding: 7px 10px; cursor: pointer; text-align: left;
+}
+.tagpicker-option:hover { background: var(--surface-2); }
+.tagpicker-desc { color: var(--text-muted); font-size: 11px; }
+
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
 .formrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
 

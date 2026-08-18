@@ -72,6 +72,7 @@ export const vi = {
   'pager.prev': 'Trước',
   'pager.next': 'Sau',
   'pager.range': '{from}–{to} trên {total}',
+  'pager.pageLabel': 'Trang',
 
   'overview.title': 'Tổng quan',
   'overview.subtitle': 'Cửa hàng của {name}.',
@@ -300,6 +301,9 @@ export const vi = {
   'profile.pw.changedAndSignedOut': 'Đã đổi mật khẩu — {count} thiết bị khác bị đăng xuất',
   'profile.pw.mismatch': 'Hai ô mật khẩu mới không giống nhau.',
   'profile.pw.foot': 'Mật khẩu mới ít nhất 8 ký tự. Đổi xong, mọi thiết bị khác bị đăng xuất.',
+
+  'tags.label': 'Tag',
+  'tags.placeholder': 'Chọn tag…',
 
   // Khoá lỗi khớp `code` do API trả về.
   'errors.hideflow_encrypted':

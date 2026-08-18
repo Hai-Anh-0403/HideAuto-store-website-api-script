@@ -3,7 +3,7 @@
 from typing import Annotated
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, File, Form, UploadFile, status
+from fastapi import APIRouter, File, Form, Query, UploadFile, status
 from fastapi.responses import FileResponse
 
 from app.api.deps import ApprovedSeller, CurrentAdmin, Paginate, build_form_model
@@ -26,6 +26,11 @@ from app.schemas.script import (
 )
 from app.services import mini_app_service, script_service
 from app.utils.ids import require_id
+
+_TAG_IDS_DESCRIPTION = (
+    "Filter by tag IDs (comma-separated). "
+    "Scripts must have ALL listed tags."
+)
 
 router = APIRouter(tags=["scripts"])
 
@@ -94,9 +99,16 @@ async def create_script(
     changelog: Annotated[str | None, Form()] = None,
     min_app_version: Annotated[str | None, Form()] = None,
     tested_app_version: Annotated[str | None, Form()] = None,
+    # Comma-separated tag ObjectIds.
+    tag_ids: Annotated[str | None, Form()] = None,
     # false = park it as a draft the seller publishes once the listing is filled in.
     publish: Annotated[bool, Form()] = True,
 ) -> ScriptRead:
+    parsed_tags = (
+        [PydanticObjectId(t.strip()) for t in tag_ids.split(",") if t.strip()]
+        if tag_ids
+        else []
+    )
     payload = build_form_model(
         ScriptCreate,
         name=name,
@@ -106,6 +118,7 @@ async def create_script(
         changelog=changelog,
         min_app_version=min_app_version,
         tested_app_version=tested_app_version,
+        tag_ids=parsed_tags,
         publish=publish,
     )
     content = await _read_upload(file)
@@ -299,3 +312,47 @@ async def admin_reject_version(
         require_id(admin.id), script_id, version_id, payload.reason
     )
     return ScriptVersionRead.model_validate(version)
+
+
+# ── Public store catalog ─────────────────────────────────────────────
+
+
+@router.get(
+    "/store/scripts",
+    response_model=Page[ScriptRead],
+    summary="Browse published scripts, optionally filtered by tags and search text",
+)
+async def browse_store(
+    page: Paginate,
+    q: str | None = None,
+    tag_ids: Annotated[str | None, Query(description=_TAG_IDS_DESCRIPTION)] = None,
+) -> Page[ScriptRead]:
+    parsed_tags: list[PydanticObjectId] | None = None
+    if tag_ids:
+        parsed_tags = [PydanticObjectId(t.strip()) for t in tag_ids.split(",") if t.strip()]
+    scripts, total = await script_service.browse_catalog(
+        tag_ids=parsed_tags, q=q, skip=page.skip, limit=page.limit
+    )
+    return _page(scripts, total, page.skip, page.limit)
+
+
+@router.get(
+    "/store/scripts/{slug_or_id}",
+    response_model=ScriptDetailRead,
+    summary="Get a published script's detail by slug or ID",
+)
+async def store_script_detail(slug_or_id: str) -> ScriptDetailRead:
+    from app.core.exceptions import NotFoundError
+    from app.repositories import script as script_repo
+    from app.repositories import script_version as version_repo
+
+    script: Script | None = None
+    try:
+        oid = PydanticObjectId(slug_or_id)
+        script = await script_repo.get_by_id(oid)
+    except Exception:
+        script = await script_repo.get_by_slug(slug_or_id)
+    if script is None:
+        raise NotFoundError("Script not found")
+    versions = await version_repo.list_for_script(require_id(script.id))
+    return _detail(script, versions)

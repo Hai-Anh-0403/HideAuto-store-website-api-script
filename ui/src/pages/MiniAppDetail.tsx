@@ -5,6 +5,7 @@ import { CapsChips } from '../ui/CapsChips'
 import { GroupChips } from '../ui/GroupChips'
 import { Pill } from '../ui/Pill'
 import { Empty, ErrorState, Loading, TableSkeleton } from '../ui/States'
+import { TagPicker } from '../ui/TagPicker'
 import { useToast } from '../ui/Toast'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
@@ -261,13 +262,15 @@ function EditListing({ s, onSaved }: { s: ScriptDetail; onSaved: () => void }) {
   const [name, setName] = useState(s.name)
   const [short, setShort] = useState(s.short_description ?? '')
   const [description, setDescription] = useState(s.description ?? '')
+  const [tagIds, setTagIds] = useState<string[]>(s.tag_ids ?? [])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
   const dirty =
     name !== s.name ||
     short !== (s.short_description ?? '') ||
-    description !== (s.description ?? '')
+    description !== (s.description ?? '') ||
+    JSON.stringify(tagIds) !== JSON.stringify(s.tag_ids ?? [])
 
   const save = async (e: FormEvent) => {
     e.preventDefault()
@@ -278,6 +281,7 @@ function EditListing({ s, onSaved }: { s: ScriptDetail; onSaved: () => void }) {
         name,
         short_description: short || null,
         description: description || null,
+        tag_ids: tagIds,
       })
       toast(t('detail.edit.saved'))
       onSaved()
@@ -326,6 +330,7 @@ function EditListing({ s, onSaved }: { s: ScriptDetail; onSaved: () => void }) {
             placeholder={t('detail.edit.descriptionPlaceholder')}
           />
         </label>
+        <TagPicker value={tagIds} onChange={setTagIds} />
         <div className="formrow">
           <button className="btn pri sm" type="submit" disabled={busy || !dirty}>
             {busy ? t('detail.edit.saving') : t('detail.edit.save')}

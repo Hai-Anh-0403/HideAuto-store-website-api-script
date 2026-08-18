@@ -68,6 +68,15 @@ export interface GraphScan {
   uses_shell: boolean
 }
 
+export interface Tag {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  color: string | null
+  created_at: string
+}
+
 export interface ScriptStats {
   rating_avg: number
   rating_count: number
@@ -81,6 +90,7 @@ export interface Script {
   name: string
   short_description: string | null
   description: string | null
+  tag_ids: string[]
   seller: { id: string; name: string }
   engine: string
   status: ScriptStatus

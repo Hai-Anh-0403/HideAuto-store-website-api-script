@@ -6,6 +6,7 @@ import { GroupChips } from '../ui/GroupChips'
 import { Pill } from '../ui/Pill'
 import { Pager } from '../ui/Pager'
 import { Empty, ErrorState, PendingApproval, TableSkeleton } from '../ui/States'
+import { TagPicker } from '../ui/TagPicker'
 import { useToast } from '../ui/Toast'
 import { useI18n } from '../i18n'
 import { api } from '../lib/api'
@@ -177,6 +178,7 @@ function UploadForm({
   const [version, setVersion] = useState('1.0.0')
   const [minApp, setMinApp] = useState('')
   const [shortDescription, setShortDescription] = useState('')
+  const [tagIds, setTagIds] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [busy, setBusy] = useState(false)
   // Giữ nguyên lỗi gốc rồi mới dịch lúc render — đổi ngôn ngữ là chữ đổi theo.
@@ -223,6 +225,7 @@ function UploadForm({
     form.append('version', version)
     form.append('publish', 'false')
     if (minApp) form.append('min_app_version', minApp)
+    if (tagIds.length) form.append('tag_ids', tagIds.join(','))
     try {
       const created = await api.upload<Script>('/sellers/me/scripts', form)
       setDraft(await api.get<ScriptDetail>(`/sellers/me/scripts/${created.id}`))
@@ -240,6 +243,7 @@ function UploadForm({
     api.patch<Script>(`/sellers/me/scripts/${id}`, {
       name,
       short_description: shortDescription || null,
+      tag_ids: tagIds,
     })
 
   const publish = async (e: FormEvent) => {
@@ -371,6 +375,8 @@ function UploadForm({
             />
           </label>
         </div>
+
+        <TagPicker value={tagIds} onChange={setTagIds} />
 
         <div className="formrow">
           <button className="btn pri" type="submit" disabled={busy || !draft}>

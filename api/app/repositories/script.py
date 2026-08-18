@@ -1,5 +1,6 @@
 """Script listing DB access."""
 
+import re
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -60,4 +61,32 @@ async def list_all(
         query["status"] = status.value
     total = await Script.find(query).count()
     items = await Script.find(query).sort("-created_at").skip(skip).limit(limit).to_list()
+    return items, total
+
+
+async def list_published(
+    *,
+    tag_ids: list[PydanticObjectId] | None = None,
+    q: str | None = None,
+    skip: int,
+    limit: int,
+) -> tuple[list[Script], int]:
+    """Public catalog: published scripts, optionally filtered by tags and search text."""
+    query: dict[str, Any] = {"status": ScriptStatus.PUBLISHED.value}
+    if tag_ids:
+        query["tag_ids"] = {"$all": tag_ids}
+    if q:
+        safe = re.escape(q)
+        query["$or"] = [
+            {"name": {"$regex": safe, "$options": "i"}},
+            {"short_description": {"$regex": safe, "$options": "i"}},
+        ]
+    total = await Script.find(query).count()
+    items = (
+        await Script.find(query)
+        .sort("-stats.rating_avg", "-published_at")
+        .skip(skip)
+        .limit(limit)
+        .to_list()
+    )
     return items, total

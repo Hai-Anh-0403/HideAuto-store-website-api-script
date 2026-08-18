@@ -11,6 +11,7 @@ from app.api.v1.routes import (
     scripts,
     sellers,
     sessions,
+    tags,
 )
 
 api_router = APIRouter()
@@ -20,5 +21,6 @@ api_router.include_router(sessions.router)
 api_router.include_router(keys.router)
 api_router.include_router(members.router)
 api_router.include_router(scripts.router)
+api_router.include_router(tags.router)
 api_router.include_router(app_client.router)
 api_router.include_router(admin_users.router)

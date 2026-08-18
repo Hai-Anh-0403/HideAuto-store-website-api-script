@@ -289,6 +289,7 @@ async def create_script(
         name=name,
         short_description=data.short_description,
         description=data.description,
+        tag_ids=data.tag_ids,
         seller=SellerRef(id=seller_id, name=seller.name),
     )
     created = await script_repo.insert(script)
@@ -341,7 +342,7 @@ async def add_version(
 
 
 async def update_script(seller: Seller, script_id: PydanticObjectId, data: ScriptUpdate) -> Script:
-    """Edit the listing text. The slug stays fixed — it is the public URL of the app."""
+    """Edit the listing text + tags. The slug stays fixed — it is the public URL of the app."""
     script = await _owned_script(require_id(seller.id), script_id)
     changes = data.model_dump(exclude_unset=True)
     for field, value in changes.items():
@@ -419,6 +420,18 @@ async def list_scripts(
     *, status: ScriptStatus | None, skip: int, limit: int
 ) -> tuple[list[Script], int]:
     return await script_repo.list_all(status=status, skip=skip, limit=limit)
+
+
+async def browse_catalog(
+    *,
+    tag_ids: list[PydanticObjectId] | None = None,
+    q: str | None = None,
+    skip: int,
+    limit: int,
+) -> tuple[list[Script], int]:
+    return await script_repo.list_published(
+        tag_ids=tag_ids, q=q, skip=skip, limit=limit
+    )
 
 
 async def get_script(script_id: PydanticObjectId) -> tuple[Script, list[ScriptVersion]]:

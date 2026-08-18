@@ -74,6 +74,7 @@ export const en: Record<keyof typeof vi, string> = {
   'pager.prev': 'Prev',
   'pager.next': 'Next',
   'pager.range': '{from}–{to} of {total}',
+  'pager.pageLabel': 'Page',
 
   'overview.title': 'Overview',
   'overview.subtitle': '{name}’s store.',
@@ -305,6 +306,9 @@ export const en: Record<keyof typeof vi, string> = {
   'profile.pw.changedAndSignedOut': 'Password changed — {count} other devices signed out',
   'profile.pw.mismatch': 'The two new passwords do not match.',
   'profile.pw.foot': 'At least 8 characters. Every other device is signed out.',
+
+  'tags.label': 'Tags',
+  'tags.placeholder': 'Pick tags…',
 
   'errors.hideflow_encrypted':
     '.hideflow files are encrypted, so the store cannot open them. Upload the mini-app package (.zip/.exe) or an app.workflow / graph .json file instead.',

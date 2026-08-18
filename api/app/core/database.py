@@ -14,6 +14,7 @@ from app.models.seller import Seller
 from app.models.seller_key import SellerKey
 from app.models.seller_member import SellerMember
 from app.models.seller_session import SellerSession
+from app.models.tag import Tag
 from app.models.upload import Upload
 
 # All Beanie document models must be registered here.
@@ -25,6 +26,7 @@ DOCUMENT_MODELS = [
     SellerSession,
     Script,
     ScriptVersion,
+    Tag,
     Upload,
     MiniAppBuild,
 ]
