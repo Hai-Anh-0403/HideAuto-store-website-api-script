@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PageDto } from '../common/dto/page.dto';
@@ -147,13 +143,17 @@ export class AdminService {
     }
 
     if (version.status !== 'PENDING_REVIEW') {
-      throw new BadRequestException('Version is not pending review');
+      throw new ConflictError(
+        'version_decided',
+        'This version has already been approved or rejected',
+      );
     }
 
     // Hard gate: a graph that still carries real secrets never goes on the store.
     const scan = readScan(version.scan);
     if (scan.embedded_credentials_count > 0) {
-      throw new ConflictException(
+      throw new ConflictError(
+        'credentials_present',
         `Version still contains ${scan.embedded_credentials_count} embedded ` +
           'credential(s); the seller must remove them and re-upload',
       );
@@ -196,7 +196,10 @@ export class AdminService {
     }
 
     if (version.status !== 'PENDING_REVIEW') {
-      throw new BadRequestException('Version is not pending review');
+      throw new ConflictError(
+        'version_decided',
+        'This version has already been approved or rejected',
+      );
     }
 
     const updatedVersion = await this.prisma.scriptVersion.update({

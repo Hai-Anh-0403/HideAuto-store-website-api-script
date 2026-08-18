@@ -65,6 +65,16 @@ export class ScriptsController {
     return this.scriptsService.create(user.id, dto, file);
   }
 
+  @Post('inspect')
+  @ApiOperation({
+    summary: 'Scan a file without saving it (pre-upload preview)',
+  })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', UPLOAD_LIMITS))
+  async inspectUpload(@UploadedFile() file: Express.Multer.File) {
+    return this.scriptsService.inspectFile(file);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get script detail with versions' })
   async findOne(

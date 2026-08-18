@@ -45,6 +45,13 @@ services:
       JWT_EXPIRES_IN: 7d
       STORAGE_DIR: /data/storage
       PORT: 3001
+      # Licensing & packaging: empty by default, so mini apps build without a licence
+      # gate rather than failing. Set these to turn activation on.
+      LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY:-}
+      LICENSE_TTL_DAYS: ${LICENSE_TTL_DAYS:-7}
+      STORE_PUBLIC_URL: ${STORE_PUBLIC_URL:-http://localhost:3001}
+      MINI_APP_TEMPLATE_PATH: ${MINI_APP_TEMPLATE_PATH:-}
+      FLOWDESK_BASE_URL: ${FLOWDESK_BASE_URL:-}
     ports:
       - "3001:3001"
     volumes:

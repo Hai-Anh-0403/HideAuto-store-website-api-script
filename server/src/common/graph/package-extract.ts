@@ -14,8 +14,8 @@
  * decompressed size are capped, and only the single entry we need is ever read.
  */
 
-import { UnprocessableEntityException } from '@nestjs/common';
 import JSZip from 'jszip';
+import { UnprocessableError } from '../errors';
 import type { Json } from './workflow-graph';
 
 const APP_WORKFLOW_ENTRY = 'resources/app.workflow';
@@ -51,8 +51,8 @@ export interface ExtractedPackage {
   graphExtracted: boolean;
 }
 
-function fail(message: string): never {
-  throw new UnprocessableEntityException(message);
+function fail(code: string, message: string): never {
+  throw new UnprocessableError(code, message);
 }
 
 function stem(filename: string): string {
@@ -95,10 +95,10 @@ function parseJson(raw: string, what: string): Json {
     // Strip a UTF-8 BOM: Windows editors add one routinely and JSON.parse chokes on it.
     parsed = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
   } catch (err) {
-    fail(`${what} is not valid JSON: ${(err as Error).message}`);
+    fail('invalid_json', `${what} is not valid JSON: ${(err as Error).message}`);
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    fail(`${what} must be a JSON object`);
+    fail('invalid_json', `${what} must be a JSON object`);
   }
   return parsed as Json;
 }
@@ -114,7 +114,10 @@ function graphFromEnvelope(payload: Json, what: string): Json {
     }
   }
   if (!Array.isArray(candidate.nodes)) {
-    fail(`${what} does not contain a workflow graph (missing nodes)`);
+    fail(
+      'not_a_graph',
+      `${what} does not contain a workflow graph (missing nodes)`,
+    );
   }
   return candidate;
 }
@@ -143,14 +146,14 @@ function fromEnvelope(
 function findAppWorkflow(zip: JSZip): JSZip.JSZipObject | null {
   const entries = Object.values(zip.files);
   if (entries.length > MAX_ARCHIVE_ENTRIES) {
-    fail('Archive has too many entries');
+    fail('archive_too_many_entries', 'Archive has too many entries');
   }
 
   let match: JSZip.JSZipObject | null = null;
   let matchDepth = -1;
   for (const entry of entries) {
     if (!entryNameIsSafe(entry.name)) {
-      fail(`Unsafe path in archive: ${entry.name}`);
+      fail('archive_unsafe_path', `Unsafe path in archive: ${entry.name}`);
     }
     const normalized = entry.name.replace(/\\/g, '/').toLowerCase();
     if (
@@ -174,6 +177,7 @@ export async function extractPackage(
 ): Promise<ExtractedPackage> {
   if (content.subarray(0, HIDEFLOW_MAGIC.length).equals(HIDEFLOW_MAGIC)) {
     fail(
+      'hideflow_encrypted',
       'Encrypted .hideflow exports are not supported yet — upload the mini-app ' +
         'package (.zip/.exe) instead',
     );
@@ -187,20 +191,21 @@ export async function extractPackage(
     try {
       zip = await JSZip.loadAsync(content);
     } catch (err) {
-      fail(`Cannot read archive: ${(err as Error).message}`);
+      fail('archive_unreadable', `Cannot read archive: ${(err as Error).message}`);
     }
 
     const entry = findAppWorkflow(zip);
     if (entry === null) {
       if (isOpaqueBinary) return opaquePackage(filename);
       fail(
+        'no_app_workflow',
         'No resources/app.workflow found — is this a hideflow mini-app package?',
       );
     }
 
     const raw = await entry.async('nodebuffer');
     if (raw.length > MAX_WORKFLOW_ENTRY_BYTES) {
-      fail('resources/app.workflow is too large');
+      fail('workflow_too_large', 'resources/app.workflow is too large');
     }
 
     return fromEnvelope(
@@ -224,6 +229,7 @@ export async function extractPackage(
   }
 
   fail(
+    'unsupported_upload',
     'Unsupported upload — expected a mini-app package (.zip/.exe) or an app.workflow ' +
       '/ graph .json file',
   );

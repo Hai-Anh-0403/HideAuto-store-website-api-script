@@ -83,13 +83,18 @@ server/
 │   ├── app.module.ts      # registers every feature module
 │   ├── prisma/            # PrismaService (global)
 │   ├── storage/           # content-addressed artifact storage (global)
+│   ├── licensing/         # ⚠ Ed25519 licence signing (global)
 │   ├── common/
 │   │   ├── dto/           # PaginationDto, PageDto
+│   │   ├── errors.ts      # AppException + coded subclasses
+│   │   ├── http-exception.filter.ts   # one envelope: { detail, code }
 │   │   └── graph/         # ⚠ domain-critical: .hideflow parse / scrub / derive
-│   ├── auth/              # login, register, JWT strategy, guards
-│   ├── sellers/ scripts/ tags/ keys/ members/ builds/ store/ admin/
+│   ├── auth/              # seller/admin login, JWT strategy, guards
+│   ├── app-client/        # end users: flowdesk auth, redeem, entitlement, licence
+│   ├── builds/            # mini-app repackaging (template inject) + packaging service
+│   ├── sellers/ scripts/ tags/ keys/ members/ store/ admin/
 │   └── …                  # each: *.module.ts, *.controller.ts, *.service.ts, dto/
-└── test/                  # workflow-graph.test.ts (run via `pnpm test`)
+└── test/                  # workflow-graph + license suites (run via `pnpm test`)
 
 web/
 ├── next.config.ts         # rewrites /api/* → API_ORIGIN
@@ -209,7 +214,11 @@ Branch naming: `feat/script-publish`, `fix/credential-scrub`, `docs/db-schema`.
 | `server/src/app.module.ts` | Module registry |
 | `server/src/common/graph/workflow-graph.ts` | Credential scrubbing + metadata derivation |
 | `server/src/common/graph/package-extract.ts` | Upload → graph extraction |
+| `server/src/common/errors.ts` | Coded domain errors (`errors.<code>` in the portal) |
 | `server/src/storage/storage.service.ts` | Content-addressed artifact storage |
+| `server/src/licensing/license.service.ts` | Ed25519 licence signing (canonical bytes) |
+| `server/src/app-client/activation.service.ts` | Key redeem, entitlement, activation |
+| `server/src/builds/packaging.service.ts` | Repackage a version into a mini-app zip |
 | `server/src/auth/` | JWT auth, guards, sessions |
 | `web/src/types.ts` | Frontend DTOs mirroring API responses |
 | `web/src/lib/api.ts` | Fetch wrapper + token handling |
@@ -225,6 +234,13 @@ Branch naming: `feat/script-publish`, `fix/credential-scrub`, `docs/db-schema`.
 - **Derive script metadata from the graph**, don't trust seller input; surface `uses_shell`.
 - **`forbidNonWhitelisted` is on**: an undeclared field in a request body is a 400, not a silent ignore.
 - **Enums are UPPERCASE, fields are camelCase** — keep `web/src/types.ts` in sync with Prisma.
+- **Errors are `{ detail, code }`**: throw the coded classes in `common/errors.ts`. Every new code
+  needs an `errors.<code>` entry in **both** `web/src/i18n/en.ts` and `vi.ts`, or the portal shows
+  the raw English detail.
+- **Two identity systems, never mixed**: sellers/admins use the store JWT (`JwtAuthGuard`), end
+  users use a flowdesk token (`AppAuthGuard`). A store JWT must never unlock `/api/v1/app/*`.
+- **Licence bytes are canonical**: `LicenseService.encodePayload` sorts keys and strips whitespace.
+  Changing that invalidates every already-installed mini app — treat it as a wire format.
 - **Commit `pnpm-lock.yaml`** so environments are reproducible.
 
 ---
@@ -239,13 +255,13 @@ git log --oneline -- api ui      # last state: "chore: checkpoint legacy api/ui 
 git show <commit>:api/app/services/script_service.py
 ```
 
-Two features from the old stack were **never ported**, and the docs that describe them are specs,
-not descriptions of running code:
+Everything from the old stack is now ported. The one piece still missing is the **Windows
+build-agent** (renaming/re-iconing the `.exe` with `rcedit`) — the server does template-inject
+packaging instead, which cannot change the executable's identity. See
+[docs/script-publish-packaging.md](./docs/script-publish-packaging.md) §4.2.
 
-- **End-user app client** (`/app/*` — heartbeat, entitlements, Ed25519 signed licences, buyer
-  download) — see [docs/mini-app-licensing.md](./docs/mini-app-licensing.md).
-- **Real mini-app repackaging** — `POST /scripts/:scriptId/builds` records a build row without
-  producing an installer artifact.
+The buyer-facing key prompt lives in the **desktop app**, not here — see
+[docs/mini-app-licensing.md](./docs/mini-app-licensing.md) §6.
 
 ---
 

@@ -1,9 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  UnauthorizedException,
-  ConflictException,
-  ForbiddenException,
-} from '@nestjs/common';
+  ConflictError,
+  ForbiddenError,
+  UnauthorizedError,
+} from '../common/errors';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -26,19 +26,31 @@ export class AuthService {
     });
 
     if (!seller) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedError(
+        'invalid_credentials',
+        'Invalid email or password',
+      );
     }
 
     const passwordValid = await bcrypt.compare(dto.password, seller.password);
     if (!passwordValid) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedError(
+        'invalid_credentials',
+        'Invalid email or password',
+      );
     }
 
     if (seller.status === 'REJECTED') {
-      throw new ForbiddenException('Account has been rejected');
+      throw new ForbiddenError(
+        'seller_rejected',
+        'This seller account was rejected',
+      );
     }
     if (seller.status === 'SUSPENDED') {
-      throw new ForbiddenException('Account has been suspended');
+      throw new ForbiddenError(
+        'seller_suspended',
+        'This seller account is suspended',
+      );
     }
 
     const jti = crypto.randomUUID();
@@ -74,7 +86,7 @@ export class AuthService {
     });
 
     if (existing) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictError('email_taken', 'Email already registered');
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -122,16 +134,22 @@ export class AuthService {
     });
 
     if (!admin) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedError(
+        'invalid_credentials',
+        'Invalid email or password',
+      );
     }
 
     const passwordValid = await bcrypt.compare(dto.password, admin.password);
     if (!passwordValid) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedError(
+        'invalid_credentials',
+        'Invalid email or password',
+      );
     }
 
     if (!admin.isActive) {
-      throw new ForbiddenException('Account is disabled');
+      throw new ForbiddenError('admin_disabled', 'This admin account is disabled');
     }
 
     const jti = crypto.randomUUID();

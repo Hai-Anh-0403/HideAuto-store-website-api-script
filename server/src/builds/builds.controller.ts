@@ -8,7 +8,10 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SellerAuthGuard } from '../auth/seller-auth.guard';
@@ -46,5 +49,20 @@ export class BuildsController {
     @Body() dto: CreateBuildDto,
   ) {
     return this.buildsService.create(user.id, scriptId, dto);
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: 'Download a packaged build' })
+  async download(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { filename, body } = await this.buildsService.download(user.id, id);
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+    return new StreamableFile(body);
   }
 }

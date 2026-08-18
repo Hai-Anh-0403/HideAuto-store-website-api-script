@@ -1,9 +1,9 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from '../common/errors';
 import slugify from 'slugify';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -257,8 +257,14 @@ export class ScriptsService {
       throw new NotFoundException('Script not found');
     }
 
-    // Dry run: parse and scan the upload without persisting anything, so the seller can
-    // see the derived metadata (and any embedded secrets) before committing a version.
+    return this.inspectFile(file);
+  }
+
+  /**
+   * Dry run: parse and scan an upload without persisting anything, so the seller sees the
+   * derived metadata — and any embedded secrets — before committing to a version.
+   */
+  async inspectFile(file: Express.Multer.File) {
     const pkg = await extractPackage(file.buffer, file.originalname);
     const { graph, scan } = scrubCredentials(pkg.graph);
     const metadata = deriveMetadata(graph);
@@ -299,7 +305,8 @@ export class ScriptsService {
     });
 
     if (existingVersion) {
-      throw new BadRequestException(
+      throw new ConflictError(
+        'version_exists',
         `Version ${dto.version} already exists for this script`,
       );
     }
@@ -344,7 +351,8 @@ export class ScriptsService {
     }
 
     if (script.status !== 'DRAFT' && script.status !== 'REJECTED') {
-      throw new BadRequestException(
+      throw new ConflictError(
+        'not_submittable',
         'Only DRAFT or REJECTED scripts can be submitted for review',
       );
     }
@@ -353,7 +361,8 @@ export class ScriptsService {
       where: { scriptId, status: 'PENDING_REVIEW' },
     });
     if (!pending) {
-      throw new BadRequestException(
+      throw new ConflictError(
+        'no_pending_version',
         'No pending version to review — upload one first',
       );
     }
@@ -389,7 +398,10 @@ export class ScriptsService {
     }
 
     if (script.status !== 'ARCHIVED') {
-      throw new BadRequestException('Only ARCHIVED scripts can be unarchived');
+      throw new ConflictError(
+        'not_archived',
+        'Only ARCHIVED scripts can be unarchived',
+      );
     }
 
     return this.prisma.script.update({
@@ -408,7 +420,10 @@ export class ScriptsService {
     }
 
     if (script.status !== 'DRAFT') {
-      throw new ForbiddenException('Only DRAFT scripts can be deleted');
+      throw new ForbiddenError(
+        'not_deletable',
+        'Only DRAFT scripts can be deleted',
+      );
     }
 
     await this.prisma.script.delete({ where: { id: scriptId } });
@@ -444,7 +459,10 @@ export class ScriptsService {
       }));
 
     if (!version?.fileUrl) {
-      throw new NotFoundException('No stored artifact for this script');
+      throw new NotFoundError(
+        'artifact_missing',
+        'No stored artifact for this script',
+      );
     }
 
     return {

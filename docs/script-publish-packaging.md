@@ -7,9 +7,10 @@ Nguồn sự thật về data: [server/prisma/schema.prisma](../server/prisma/sc
 > **Tóm tắt 1 dòng**: seller upload **gói mini-app `.exe`/`.zip`** (hoặc `.hideflow`) → store **tách workflow graph**
 > ra → **scrub credential + derive metadata** → lưu & duyệt → khi buyer tải, store **đóng gói lại** `.exe`.
 
-> **Trạng thái**: upload → tách graph → scrub → derive → duyệt **đã chạy** trên server NestJS
-> (`server/src/common/graph/`, gate 409 khi còn credential). **Đóng gói lại `.exe` chưa port** —
-> `POST /scripts/:scriptId/builds` mới chỉ ghi bản ghi build, chưa sinh installer.
+> **Trạng thái**: toàn bộ luồng **đã chạy** trên server NestJS — upload → tách graph → scrub →
+> derive → duyệt (`server/src/common/graph/`, gate 409 khi còn credential) và **đóng gói lại**
+> theo kiểu template-inject (§4.1, `server/src/builds/`). Chỉ **build-agent Windows** (§4.2 —
+> đổi tên/icon `.exe` bằng `rcedit`) là chưa có.
 
 ---
 

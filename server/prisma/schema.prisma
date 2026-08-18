@@ -186,11 +186,13 @@ enum MemberStatus {
 }
 
 model SellerKey {
-  id        String    @id @default(cuid())
-  sellerId  String    @map("seller_id")
-  seller    Seller    @relation(fields: [sellerId], references: [id])
-  scriptId  String    @map("script_id")
-  script    Script    @relation(fields: [scriptId], references: [id])
+  id       String  @id @default(cuid())
+  sellerId String  @map("seller_id")
+  seller   Seller  @relation(fields: [sellerId], references: [id])
+  /// null = shop-wide key: redeeming it unlocks every app from this seller.
+  scriptId String? @map("script_id")
+  script   Script? @relation(fields: [scriptId], references: [id])
+
   key       String    @unique
   label     String?
   status    KeyStatus @default(ACTIVE)

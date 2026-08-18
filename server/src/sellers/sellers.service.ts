@@ -1,9 +1,6 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { UnauthorizedError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateSellerDto } from './dto/update-seller.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -106,7 +103,10 @@ export class SellersService {
 
     const valid = await bcrypt.compare(dto.oldPassword, seller.password);
     if (!valid) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new UnauthorizedError(
+        'wrong_password',
+        'Current password is incorrect',
+      );
     }
 
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);

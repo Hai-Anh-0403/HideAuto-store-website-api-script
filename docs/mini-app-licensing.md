@@ -7,11 +7,11 @@ Phần đóng gói/publish: [script-publish-packaging.md](./script-publish-packa
 > **Tóm tắt 1 dòng**: store ký một **licence Ed25519** gắn với (mini app, user, máy); gói mini app
 > mang sẵn public key và tự kiểm licence lúc mở, hết hạn thì hỏi lại store.
 
-> ⚠️ **Trạng thái sau khi chuyển sang NestJS: đây là SPEC, chưa có code.**
-> Bản Python cũ từng làm xong §3–§5, nhưng phần đó **chưa được port** (xem `git log -- api`).
-> Server hiện tại **chưa có** `/app/*` (heartbeat, entitlement, licence ký Ed25519, buyer download).
-> Seller phát key thì đã chạy (`/api/v1/keys`). Cổng nhập key trong mini app ở repo
-> `desktop-app-workflow`, xem §6.
+> **Trạng thái**: phía store **đã code xong** trên NestJS (§3–§5):
+> `server/src/licensing/` (ký Ed25519), `server/src/app-client/` (`/api/v1/app/*`:
+> heartbeat, redeem, entitlement, licence, buyer download), `server/src/builds/`
+> (nhét khối `store` vào gói). Test: `server/test/license.test.ts`.
+> Cổng nhập key **trong mini app** vẫn **chưa làm** — nằm ở repo `desktop-app-workflow`, xem §6.
 
 ---
 

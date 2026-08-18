@@ -12,9 +12,88 @@ import { useAuth } from '@/lib/auth'
 import { useErrorText } from '@/lib/errors'
 import { fmtCount, scriptPill } from '@/lib/pills'
 import { useFetch } from '@/lib/useFetch'
-import type { Page, Script } from '@/types'
+import type { Page, Script, ScriptInspect } from '@/types'
 
 const PAGE_SIZE = 20
+
+/** "gmail-auto.zip" → "gmail-auto" — a sensible default name from the filename. */
+function stripExtension(filename: string): string {
+  const dot = filename.lastIndexOf('.')
+  return dot > 0 ? filename.slice(0, dot) : filename
+}
+
+/* ────────────────── Pre-upload scan result ────────────────── */
+
+function InspectPreview({
+  inspect,
+  filename,
+}: {
+  inspect: ScriptInspect
+  filename: string
+}) {
+  const { t } = useI18n()
+
+  // A packed .exe keeps its graph behind the desktop app's key: nothing was scanned,
+  // so say that plainly rather than showing a reassuring "0 secrets".
+  if (!inspect.graphExtracted) {
+    return (
+      <div className="banner warn" style={{ marginBottom: 12 }}>
+        <span className="bi">📦</span>
+        <div>
+          <b>{t('preview.opaqueTitle', { name: filename })}</b>
+          {t('preview.opaqueBody')}
+        </div>
+      </div>
+    )
+  }
+
+  const dirty = inspect.embeddedCredentialsCount > 0
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div className={dirty ? 'banner warn' : 'banner ok'}>
+        <span className="bi">{dirty ? '!' : '✓'}</span>
+        <div>
+          <b>
+            {t('preview.extracted', {
+              name: filename,
+              count: inspect.nodeCount,
+            })}
+          </b>
+          {dirty ? (
+            <div>
+              {t('preview.credentials', {
+                count: inspect.embeddedCredentialsCount,
+              })}
+              <div className="chips" style={{ marginTop: 6 }}>
+                {inspect.credentialPaths.map((p) => (
+                  <span key={p} className="keychip">🔑 {p}</span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              {t('preview.clean', {
+                groups: inspect.nodeGroupsUsed.join(', ') || t('preview.noNodes'),
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {(inspect.nodeGroupsUsed.length > 0 || inspect.usesShell) && (
+        <div className="chips" style={{ marginTop: 8 }}>
+          <span className="note">{t('preview.needs')}:</span>
+          {inspect.nodeGroupsUsed.map((g) => (
+            <span key={g} className="groupchip" data-group={g}>
+              {g}
+            </span>
+          ))}
+          {inspect.usesShell && <Pill tone="bad">⚠ shell</Pill>}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /* ────────────────── Upload form (modal-like card) ────────────────── */
 
@@ -31,14 +110,39 @@ function UploadForm({
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [file, setFile] = useState<File | null>(null)
+  const [inspect, setInspect] = useState<ScriptInspect | null>(null)
+  const [inspecting, setInspecting] = useState(false)
+  const [inspectError, setInspectError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [shortDesc, setShortDesc] = useState('')
   const [tagIds, setTagIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
 
+  /**
+   * Scan the picked file before anything is created, so credential warnings show up
+   * while the seller can still fix them — nothing is persisted by this call.
+   */
+  const pickFile = async (f: File) => {
+    setFile(f)
+    setInspect(null)
+    setInspectError(null)
+    setInspecting(true)
+    try {
+      const form = new FormData()
+      form.append('file', f)
+      const result = await api.upload<ScriptInspect>('/scripts/inspect', form)
+      setInspect(result)
+      if (!name) setName(stripExtension(f.name))
+    } catch (err) {
+      setInspectError(errorText(err, 'upload.inspectFailed'))
+    } finally {
+      setInspecting(false)
+    }
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
-    if (f) setFile(f)
+    if (f) void pickFile(f)
   }
 
   const publish = async () => {
@@ -85,6 +189,18 @@ function UploadForm({
             style={{ display: 'none' }}
           />
         </div>
+
+        {inspecting && <div className="state">{t('upload.inspecting')}</div>}
+        {inspectError && (
+          <div className="banner bad">
+            <span className="bi">!</span>
+            <div>{inspectError}</div>
+          </div>
+        )}
+        {inspect && file && (
+          <InspectPreview inspect={inspect} filename={file.name} />
+        )}
+
         <div className="grid2">
           <label className="field">
             <span>{t('upload.name')}</span>
