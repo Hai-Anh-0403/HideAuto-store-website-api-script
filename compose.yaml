@@ -45,6 +45,12 @@ services:
       JWT_EXPIRES_IN: 7d
       STORAGE_DIR: /data/storage
       PORT: 3001
+      # Seeded on first boot so the stack is usable immediately: without an admin,
+      # nobody can approve a seller and the portal is a dead end.
+      # ⚠️ This default password is public knowledge — override it for anything that
+      # is not a laptop.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@local.test}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
       # Licensing & packaging: empty by default, so mini apps build without a licence
       # gate rather than failing. Set these to turn activation on.
       LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY:-}

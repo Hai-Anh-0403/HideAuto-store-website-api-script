@@ -38,5 +38,7 @@ COPY --from=build /app/server/dist server/dist
 
 WORKDIR /app/server
 EXPOSE 3001
-# Apply the schema before serving so a fresh volume comes up ready.
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/main"]
+# Apply the schema and seed baseline data before serving, so a fresh volume comes up
+# usable. Both steps are idempotent. Seeding is allowed to fail without blocking the
+# API — it logs the reason, and the store still works, just without tags/admin.
+CMD ["sh", "-c", "npx prisma db push --skip-generate && (node dist/seed.js || echo '[seed] skipped') && node dist/main"]

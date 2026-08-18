@@ -23,11 +23,16 @@ docker compose up -d --build
 - Web: <http://localhost:3000>
 - API + Swagger: <http://localhost:3001/docs> (dùng để thao tác **admin**: duyệt seller, duyệt version)
 
+Server tự `prisma db push` + seed lúc khởi động, nên DB trống vẫn dùng được ngay:
+6 tag mặc định và một admin **`admin@local.test` / `admin12345`**.
+
+> ⚠️ Mật khẩu admin mặc định đó nằm trong repo, ai cũng biết. Máy cá nhân thì tiện, còn
+> deploy ra chỗ truy cập được thì **bắt buộc** đặt `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `JWT_SECRET`
+> và đổi mật khẩu Postgres. Seed không bao giờ ghi đè mật khẩu của admin đã tồn tại.
+
 Lần sau chỉ cần `docker compose up -d` (thêm `--build` khi code đổi) · `docker compose stop` để tắt ·
 `docker compose logs -f server` xem log · `docker compose down -v` xoá sạch cả dữ liệu.
 Chi tiết ở [compose.yaml](./compose.yaml).
-
-Đặt `JWT_SECRET` thật trước khi deploy — giá trị mặc định trong compose chỉ dùng cho máy local.
 
 ---
 
@@ -47,6 +52,8 @@ pnpm db:seed                         # tag mặc định (+ admin nếu đặt A
 pnpm dev                             # chạy song song server (3001) + web (3000)
 ```
 
+Chạy native thì `db:push`/`db:seed` phải gọi tay — chỉ bản Docker mới tự làm lúc khởi động.
+
 Next rewrite `/api/*` → `http://localhost:3001`, không cần cấu hình CORS. Đổi origin bằng
 `API_ORIGIN` (xem [web/.env.example](./web/.env.example)).
 
@@ -57,8 +64,8 @@ Chạy riêng: `pnpm dev:server` hoặc `pnpm dev:web`.
 ## Thử một vòng đầy đủ
 
 1. **Web** → tab *Đăng ký* → tạo seller (trạng thái `PENDING`).
-2. **Swagger** → `POST /api/v1/auth/admin/login` → lấy token → `Authorize` →
-   `GET /api/v1/admin/sellers` → `PATCH /api/v1/admin/sellers/{id}/approve`.
+2. **Swagger** → `POST /api/v1/auth/admin/login` (`admin@local.test` / `admin12345`) → lấy token →
+   `Authorize` → `GET /api/v1/admin/sellers` → `PATCH /api/v1/admin/sellers/{id}/approve`.
 3. **Web** → đăng nhập seller → *Mini app của tôi* → **Tải mini app lên**
    (gói `.zip`/`.exe` của mini app, hoặc file `app.workflow` / graph `.json`).
    Store tự tách graph, **xoá credential**, và suy ra node/khả năng/biến từ graph.
