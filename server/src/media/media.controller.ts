@@ -96,6 +96,7 @@ export class MediaServeController {
     res.set({
       'Content-Type': contentType,
       'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
     });
 
     const data = await fs.readFile(filePath);

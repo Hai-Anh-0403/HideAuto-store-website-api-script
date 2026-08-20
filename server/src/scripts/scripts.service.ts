@@ -193,7 +193,12 @@ export class ScriptsService {
         videoUrl: dto.videoUrl || undefined,
         thumbnailUrl: dto.thumbnailUrl || undefined,
         images: dto.images
-          ? JSON.stringify(dto.images.split(',').filter(Boolean))
+          ? JSON.stringify(
+              dto.images
+                .split(',')
+                .filter(Boolean)
+                .filter((u) => /^https?:\/\//i.test(u)),
+            )
           : undefined,
         minAppVersion: dto.minAppVersion,
         sellerId,

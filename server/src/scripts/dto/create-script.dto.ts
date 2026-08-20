@@ -1,9 +1,11 @@
 import {
   IsString,
   IsOptional,
+  IsUrl,
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -53,13 +55,15 @@ export class CreateScriptDto {
 
   @ApiPropertyOptional({ description: 'YouTube/Vimeo embed URL' })
   @IsOptional()
-  @IsString()
+  @ValidateIf((o) => o.videoUrl !== '')
+  @IsUrl({ protocols: ['https', 'http'], require_protocol: true }, { message: 'videoUrl must be a valid HTTP(S) URL' })
   @MaxLength(500)
   videoUrl?: string;
 
   @ApiPropertyOptional({ description: 'Thumbnail image URL (from media upload)' })
   @IsOptional()
-  @IsString()
+  @ValidateIf((o) => o.thumbnailUrl !== '')
+  @IsUrl({ protocols: ['https', 'http'], require_protocol: true }, { message: 'thumbnailUrl must be a valid HTTP(S) URL' })
   @MaxLength(500)
   thumbnailUrl?: string;
 
