@@ -7,7 +7,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     languageOptions: {
-      parserOptions: { project: ['./tsconfig.json'], tsconfigRootDir: import.meta.dirname },
+      parserOptions: { project: ['./tsconfig.eslint.json'], tsconfigRootDir: import.meta.dirname },
     },
     rules: {
       // NestJS DTOs and Prisma JSON columns legitimately widen to `any` at the edges;

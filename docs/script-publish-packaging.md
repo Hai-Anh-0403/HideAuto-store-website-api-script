@@ -155,28 +155,49 @@ Chi tiết trường: [server/prisma/schema.prisma](../server/prisma/schema.pris
 
 ## 6. Endpoint
 
-Đã code (`server/src/scripts/scripts.controller.ts`, prefix `/api/v1`):
+Đường dẫn thật của server NestJS (mỗi controller tự khai báo prefix `/api/v1`):
 
 | Method · Path | Việc |
 |---|---|
-| `POST /sellers/me/scripts` | multipart (`file` + form) → tách + scrub + derive → script `draft` + version `pending_review` |
-| `POST /sellers/me/scripts/{id}/versions` | upload bản mới (quét & duyệt lại từ đầu) |
-| `POST /sellers/me/scripts/{id}/submit` | gửi duyệt (`draft`/`rejected` → `pending_review`) |
-| `GET /sellers/me/scripts` · `/{id}` | liệt kê / chi tiết (capabilities, versions, scan, moderation) |
-| `GET /admin/scripts` · `/{id}` | hàng đợi duyệt |
-| `POST /admin/scripts/{id}/versions/{vid}/approve` | duyệt → publish (**chặn nếu còn secret**) |
-| `POST /admin/scripts/{id}/versions/{vid}/reject` | từ chối kèm `reason` |
-| `POST /sellers/me/scripts/{id}/keys` · `GET …/keys` | phát hành / liệt kê khóa **mở đúng 1 mini app** |
-| `POST /sellers/me/scripts/{id}/mini-app-builds` | đóng gói lại `.zip` (server template inject) |
-| `GET /sellers/me/scripts/{id}/mini-app-builds` | liệt kê bản đóng gói |
-| `GET /sellers/me/scripts/{id}/download?format=graph\|exe` | seller tải artifact của chính mình |
-| `GET /app/scripts` | end-user liệt kê mini app **đã mở khóa** |
-| `GET /app/scripts/{id}/download?format=exe\|graph` | end-user tải (kiểm tra entitlement) |
-| `POST /app/scripts/{id}/license` | **mini app kích hoạt**: `{key?, machine_id}` → licence đã ký |
+| `POST /api/v1/scripts` | multipart (`file` + form) → tách + scrub + derive → script `DRAFT` + version `PENDING_REVIEW` |
+| `POST /api/v1/scripts/{id}/versions` | upload bản mới (quét lại từ đầu, **không** đổi bản đang bán) |
+| `DELETE /api/v1/scripts/{id}/versions/{vid}` | xoá bản chờ duyệt / bị từ chối (không xoá bản đang bán) |
+| `POST /api/v1/scripts/{id}/versions/{vid}/rollback` | đưa một bản `APPROVED` cũ trở lại làm bản đang bán |
+| `POST /api/v1/scripts/{id}/submit` | gửi duyệt (`DRAFT`/`REJECTED` → `PENDING_REVIEW`) |
+| `GET /api/v1/scripts` · `/{id}` | liệt kê (search · status · sort) / chi tiết (capabilities, versions, scan) |
+| `POST /api/v1/scripts/{id}/archive` · `/unarchive` | gỡ khỏi store / đưa lại |
+| `GET /api/v1/admin/sellers?status=&search=` | hàng đợi duyệt cửa hàng |
+| `PATCH /api/v1/admin/sellers/{id}/approve` · `/reject` · `/suspend` | quyết định kèm `reason` (seller đọc được) |
+| `GET /api/v1/admin/scripts` | hàng đợi duyệt **version** (kèm scan + capabilities) |
+| `PATCH /api/v1/admin/scripts/versions/{vid}/approve` | duyệt → bản này thành bản đang bán (**chặn nếu còn secret**) |
+| `PATCH /api/v1/admin/scripts/versions/{vid}/reject` | từ chối kèm `reason`; listing đang bán **không** bị gỡ |
+| `POST /api/v1/keys` | phát 1 hoặc nhiều khoá (`quantity`); bỏ `scriptId` = khoá toàn shop |
+| `GET /api/v1/keys?state=&scriptId=&q=` · `GET /api/v1/keys/stats` | liệt kê / đếm theo trạng thái suy ra |
+| `GET /api/v1/keys/export` | tải CSV theo đúng bộ lọc đang xem |
+| `PATCH /api/v1/keys/{id}` · `/revoke` · `/restore` · `DELETE` | sửa hạn mức / thu hồi / bỏ thu hồi / xoá khoá chưa ai dùng |
+| `GET /api/v1/keys/{id}/redemptions` | ai đã dùng khoá này |
+| `GET /api/v1/members?status=&online=&search=` | người mua (kèm khoá họ đã nhập) |
+| `PATCH /api/v1/members/{id}/access` | cấp / thu quyền từng mini app sau khi đã redeem |
+| `GET /api/v1/members/{id}/devices` · `PATCH …/devices/{machineId}/block` · `/unblock` | máy của người mua + chặn từng máy |
+| `POST /api/v1/scripts/{id}/builds` · `GET` | đóng gói lại `.zip` (server template inject) / liệt kê |
+| `GET /api/v1/scripts/{id}/builds/{buildId}/download` | seller tải **gói .zip** đã đóng |
+| `GET /api/v1/scripts/{id}/download` | seller tải graph JSON đã scrub |
+| `GET /api/v1/app/scripts` | end-user liệt kê mini app **đã mở khóa** |
+| `GET /api/v1/app/scripts/{id}/download?format=exe\|graph` | end-user tải (kiểm tra entitlement) |
+| `POST /api/v1/app/scripts/{id}/license` | **mini app kích hoạt**: `{key?, machine_id}` → licence đã ký |
+| `POST /api/v1/app/keys/redeem` | end-user nhập khoá (có rate limit) |
+
+Giao diện duyệt của admin: `web/src/app/admin/page.tsx` (`/admin`, đăng nhập bằng tài khoản admin,
+token để riêng khỏi token seller).
 
 ### 6.2 Khóa & quyền truy cập
 
-- `seller_keys.script_id` = mini app mà khóa mở. `null` = khóa toàn shop (khóa cũ, mở mọi app).
+- `seller_keys.script_id` = mini app mà khóa mở. `null` = **khóa toàn shop**, mở mọi app của seller
+  (tạo bằng `POST /api/v1/keys` không kèm `scriptId`).
+- Mã khóa dạng người đọc được: `SK-XXXXX-XXXXX-XXXXX-XXXXX` (bảng chữ bỏ 0/O/1/I/L/U). Khi redeem,
+  server thử đúng chuỗi đã lưu trước, rồi tới dạng chuẩn hoá — khóa hex 32 ký tự cũ vẫn dùng được.
+- `key_redemptions` ghi ai đã dùng khóa nào; `member_devices` ghi máy đã kích hoạt (nguồn của danh
+  sách chặn theo máy).
 - Redeem khóa → `seller_members.script_ids` thêm app đó (`all_scripts = true` với khóa toàn shop).
   Cùng 1 user redeem nhiều khóa của cùng seller ⇒ vẫn 1 membership, cộng dồn danh sách app.
 - Tải về yêu cầu: script `published` + membership `active` + app nằm trong entitlement.

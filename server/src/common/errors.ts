@@ -50,6 +50,12 @@ export class ConflictError extends AppException {
   }
 }
 
+export class TooManyRequestsError extends AppException {
+  constructor(code: string, message: string) {
+    super(code, message, HttpStatus.TOO_MANY_REQUESTS);
+  }
+}
+
 export class UnprocessableError extends AppException {
   constructor(code: string, message: string) {
     super(code, message, HttpStatus.UNPROCESSABLE_ENTITY);

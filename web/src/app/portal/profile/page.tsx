@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import { PendingBanner } from '@/components/PendingBanner'
 import { Pill } from '@/components/Pill'
 import { useToast } from '@/components/Toast'
 import { useI18n } from '@/i18n'
@@ -27,15 +28,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {seller.status !== 'APPROVED' && (
-        <div className="banner warn">
-          <span className="bi">!</span>
-          <div>
-            <b>{t('common.pendingApproval.title')}</b>
-            {t('common.pendingApproval.body')}
-          </div>
-        </div>
-      )}
+      <PendingBanner />
 
       <StoreInfo seller={seller} onSaved={refresh} />
       <Devices key={devicesKey} logout={logout} />

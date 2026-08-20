@@ -54,6 +54,8 @@ cp server/.env.example server/.env
 
 pnpm db:push                  # apply schema.prisma to the database
 pnpm db:seed                  # baseline tags (+ admin if ADMIN_EMAIL/ADMIN_PASSWORD set)
+pnpm db:seed:demo             # dev only: an APPROVED seller with scripts/keys/members
+pnpm db:seed:demo:clear       # remove that seller and everything it owns again
 pnpm dev                      # server on :3001, web on :3000
 
 pnpm -r run build             # build both packages
@@ -219,7 +221,11 @@ Branch naming: `feat/script-publish`, `fix/credential-scrub`, `docs/db-schema`.
 | `server/src/licensing/license.service.ts` | Ed25519 licence signing (canonical bytes) |
 | `server/src/app-client/activation.service.ts` | Key redeem, entitlement, activation |
 | `server/src/builds/packaging.service.ts` | Repackage a version into a mini-app zip |
-| `server/src/auth/` | JWT auth, guards, sessions |
+| `server/src/auth/` | JWT auth, guards, sessions (`JwtStrategy` checks the session row) |
+| `server/src/auth/approved-seller.guard.ts` | APPROVED gate on every selling endpoint |
+| `server/src/common/rate-limit.guard.ts` | `@RateLimit()` on login / register / redeem / licence |
+| `server/src/keys/key-code.ts` | Human-typeable activation codes + normalisation |
+| `web/src/app/admin/page.tsx` | Admin console: seller queue + version review |
 | `web/src/types.ts` | Frontend DTOs mirroring API responses |
 | `web/src/lib/api.ts` | Fetch wrapper + token handling |
 | `web/src/lib/pills.ts` | Status → badge mapping (UPPERCASE keys) |
@@ -239,6 +245,17 @@ Branch naming: `feat/script-publish`, `fix/credential-scrub`, `docs/db-schema`.
   the raw English detail.
 - **Two identity systems, never mixed**: sellers/admins use the store JWT (`JwtAuthGuard`), end
   users use a flowdesk token (`AppAuthGuard`). A store JWT must never unlock `/api/v1/app/*`.
+- **A seller token is only as alive as its session row**: `JwtStrategy` rejects a token whose
+  `seller_sessions` row is gone, which is what makes logout and "sign out other devices" real.
+- **Selling needs APPROVED**: `ApprovedSellerGuard` guards scripts / keys / members / builds;
+  `/sellers/me` deliberately stays open, and login accepts a REJECTED/SUSPENDED seller on
+  purpose — the portal is read-only for them and it is the only way the admin's reason reaches
+  the person who has to act on it.
+- **Rate limiting buckets on `request.ip` and the subject** (the email / key being tried), never
+  on a raw `x-forwarded-for` — that header is written by the caller. `TRUST_PROXY` (off by
+  default) is what lets Express resolve it, and only for a proxy that overwrites it.
+- **`latestVersionId` is the *live* version**: an upload never moves it — only approval or an
+  explicit rollback does. Rejecting an update leaves the published listing selling.
 - **Licence bytes are canonical**: `LicenseService.encodePayload` sorts keys and strips whitespace.
   Changing that invalidates every already-installed mini app — treat it as a wire format.
 - **Commit `pnpm-lock.yaml`** so environments are reproducible.

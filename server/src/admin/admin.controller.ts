@@ -3,6 +3,8 @@ import {
   Get,
   Patch,
   Body,
+  HttpCode,
+  HttpStatus,
   Param,
   Query,
   UseGuards,
@@ -16,6 +18,8 @@ import {
 } from '../auth/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { ListSellersDto } from './dto/list-sellers.dto';
+import { SellerDecisionDto } from './dto/seller-decision.dto';
 import { RejectVersionDto } from './dto/reject-version.dto';
 
 @ApiTags('Admin')
@@ -26,27 +30,30 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('sellers')
-  @ApiOperation({ summary: 'List all sellers (paginated)' })
-  async listSellers(@Query() pagination: PaginationDto) {
-    return this.adminService.listSellers(pagination);
+  @ApiOperation({ summary: 'List sellers (paginated, filterable by status and text)' })
+  async listSellers(@Query() dto: ListSellersDto) {
+    return this.adminService.listSellers(dto);
   }
 
   @Patch('sellers/:id/approve')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve a seller' })
   async approveSeller(@Param('id') id: string) {
     return this.adminService.approveSeller(id);
   }
 
   @Patch('sellers/:id/reject')
-  @ApiOperation({ summary: 'Reject a seller' })
-  async rejectSeller(@Param('id') id: string) {
-    return this.adminService.rejectSeller(id);
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reject a seller, with a reason they will see' })
+  async rejectSeller(@Param('id') id: string, @Body() dto: SellerDecisionDto) {
+    return this.adminService.rejectSeller(id, dto.reason);
   }
 
   @Patch('sellers/:id/suspend')
-  @ApiOperation({ summary: 'Suspend a seller' })
-  async suspendSeller(@Param('id') id: string) {
-    return this.adminService.suspendSeller(id);
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Suspend a seller, with a reason they will see' })
+  async suspendSeller(@Param('id') id: string, @Body() dto: SellerDecisionDto) {
+    return this.adminService.suspendSeller(id, dto.reason);
   }
 
   @Get('scripts')
@@ -56,6 +63,7 @@ export class AdminController {
   }
 
   @Patch('scripts/versions/:id/approve')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve a script version' })
   async approveVersion(
     @CurrentUser() user: RequestUser,
@@ -65,6 +73,7 @@ export class AdminController {
   }
 
   @Patch('scripts/versions/:id/reject')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reject a script version' })
   async rejectVersion(
     @CurrentUser() user: RequestUser,

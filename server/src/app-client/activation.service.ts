@@ -16,6 +16,7 @@ import type { Script, SellerMember } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LicenseService, type SignedLicense } from '../licensing/license.service';
 import { ForbiddenError, NotFoundError } from '../common/errors';
+import { normalizeKeyCode } from '../keys/key-code';
 import type { BuyerIdentity } from './flowdesk.service';
 
 @Injectable()
@@ -34,9 +35,7 @@ export class ActivationService {
    * simply accumulates unlocked apps.
    */
   async redeem(buyer: BuyerIdentity, rawKey: string): Promise<SellerMember> {
-    const key = await this.prisma.sellerKey.findUnique({
-      where: { key: rawKey.trim() },
-    });
+    const key = await this.findKey(rawKey);
 
     // A revoked key is indistinguishable from a wrong one on purpose — don't confirm
     // that a given key string ever existed.
@@ -58,23 +57,54 @@ export class ActivationService {
       throw new ForbiddenError('seller_unavailable', 'Seller not available');
     }
 
-    const existing = await this.prisma.sellerMember.findUnique({
-      where: { sellerId_userId: { sellerId: key.sellerId, userId: buyer.id } },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.sellerMember.findUnique({
+        where: { sellerId_userId: { sellerId: key.sellerId, userId: buyer.id } },
+      });
 
-    // A shop-wide key (scriptId === null) unlocks everything; otherwise add just that app.
-    const shopWide = key.scriptId === null;
-    const scriptIds = new Set(existing?.scriptIds ?? []);
-    if (key.scriptId) scriptIds.add(key.scriptId);
+      // A blocked buyer gets nothing from a key, so it must not cost them one — burning a
+      // use here would quietly consume a key the seller sold to someone else.
+      if (existing?.status === 'BLOCKED') {
+        throw new ForbiddenError(
+          'member_blocked',
+          'Your access to this seller has been blocked',
+        );
+      }
 
-    const alreadyEntitled =
-      existing !== null &&
-      (shopWide
-        ? existing.allScripts
-        : key.scriptId !== null && existing.scriptIds.includes(key.scriptId));
+      // A shop-wide key (scriptId === null) unlocks everything; otherwise add just that app.
+      const shopWide = key.scriptId === null;
+      const scriptIds = new Set(existing?.scriptIds ?? []);
+      if (key.scriptId) scriptIds.add(key.scriptId);
 
-    const [member] = await this.prisma.$transaction([
-      this.prisma.sellerMember.upsert({
+      const alreadyEntitled =
+        existing !== null &&
+        (shopWide
+          ? existing.allScripts
+          : key.scriptId !== null && existing.scriptIds.includes(key.scriptId));
+
+      // Don't burn a use when the key grants nothing new — re-entering a key the buyer
+      // already redeemed (a reinstall, say) shouldn't eat their remaining uses.
+      if (!alreadyEntitled) {
+        // Claim the use with the quota re-checked *inside* the update. The read above can
+        // go stale between two concurrent redeems; this cannot — Postgres locks the row,
+        // so the last remaining use is handed to exactly one of them.
+        const claimed = await tx.sellerKey.updateMany({
+          where: {
+            id: key.id,
+            status: 'ACTIVE',
+            OR: [
+              { maxUses: null },
+              { usedCount: { lt: this.prisma.sellerKey.fields.maxUses } },
+            ],
+          },
+          data: { usedCount: { increment: 1 } },
+        });
+        if (claimed.count === 0) {
+          throw new ForbiddenError('key_exhausted', 'Key usage limit reached');
+        }
+      }
+
+      const member = await tx.sellerMember.upsert({
         where: { sellerId_userId: { sellerId: key.sellerId, userId: buyer.id } },
         create: {
           sellerId: key.sellerId,
@@ -95,20 +125,39 @@ export class ActivationService {
           // to ACTIVE on any redeem, which let a blocked buyer undo the block with a key
           // they already had. Unblocking stays the seller's decision.
         },
-      }),
-      // Don't burn a use when the key grants nothing new — re-entering a key the buyer
-      // already redeemed (a reinstall, say) shouldn't eat their remaining uses.
-      ...(alreadyEntitled
-        ? []
-        : [
-            this.prisma.sellerKey.update({
-              where: { id: key.id },
-              data: { usedCount: { increment: 1 } },
-            }),
-          ]),
-    ]);
+      });
 
-    return member;
+      // Provenance, so the seller can answer "who used the key I sold?". Keyed on
+      // (key, member): a reinstall re-runs redeem and must not add a second row.
+      await tx.keyRedemption.upsert({
+        where: { keyId_memberId: { keyId: key.id, memberId: member.id } },
+        create: { keyId: key.id, memberId: member.id, scriptId: key.scriptId },
+        update: {},
+      });
+
+      return member;
+    });
+  }
+
+  /**
+   * Look a key up the way a buyer typed it.
+   *
+   * Codes are handed over in chat messages and invoices, so the input arrives lowercased,
+   * without dashes, or with the `SK` prefix dropped. The exact string is tried first —
+   * that is the only thing that can match a legacy 32-hex key — then the canonical form of
+   * whatever was typed. `normalizeKeyCode` refuses ambiguous characters rather than
+   * guessing, so this can never resolve a typo onto a different seller's key.
+   */
+  private async findKey(rawKey: string) {
+    const trimmed = rawKey.trim();
+    const exact = await this.prisma.sellerKey.findUnique({
+      where: { key: trimmed },
+    });
+    if (exact) return exact;
+
+    const canonical = normalizeKeyCode(trimmed);
+    if (!canonical || canonical === trimmed) return null;
+    return this.prisma.sellerKey.findUnique({ where: { key: canonical } });
   }
 
   /** Every published script this buyer has unlocked, across all sellers. */
@@ -164,6 +213,16 @@ export class ActivationService {
       );
     }
 
+    // Suspending a shop has to stop delivery too: without this the store keeps handing out
+    // downloads and fresh licences for a seller an admin has just taken off the platform.
+    const seller = await this.prisma.seller.findUnique({
+      where: { id: script.sellerId },
+      select: { status: true },
+    });
+    if (!seller || seller.status !== 'APPROVED') {
+      throw new ForbiddenError('seller_unavailable', 'Seller not available');
+    }
+
     // Redeem first: a key sent with the request is how a fresh install unlocks the app.
     if (opts.key) {
       await this.redeem(buyer, opts.key);
@@ -205,7 +264,7 @@ export class ActivationService {
     machineId: string,
     key?: string,
   ): Promise<SignedLicense> {
-    const { script } = await this.authorize(buyer, scriptId, {
+    const { script, member } = await this.authorize(buyer, scriptId, {
       key,
       machineId,
     });
@@ -232,15 +291,39 @@ export class ActivationService {
       expires_at: expiresAt,
     });
 
-    // Best effort: a failed presence update must never cost the buyer their activation.
+    // Best effort: a failed bookkeeping write must never cost the buyer their activation.
     try {
       await this.touch(buyer, script.sellerId);
+      await this.recordDevice(member.id, machineId, script.id);
     } catch (err) {
       this.logger.warn(
         `presence update after activation failed for ${buyer.id}: ${(err as Error).message}`,
       );
     }
     return signed;
+  }
+
+  /**
+   * Remember the machine this activation came from.
+   *
+   * Without this row the seller has no way to learn a machine id, and
+   * `SellerMember.blockedDevices` — which the licence path already enforces — could only
+   * ever stay empty.
+   */
+  private async recordDevice(
+    memberId: string,
+    machineId: string,
+    scriptId: string,
+  ): Promise<void> {
+    await this.prisma.memberDevice.upsert({
+      where: { memberId_machineId: { memberId, machineId } },
+      create: { memberId, machineId, scriptId, activationCount: 1 },
+      update: {
+        scriptId,
+        lastSeenAt: new Date(),
+        activationCount: { increment: 1 },
+      },
+    });
   }
 
   /** Record that the buyer is alive, so the seller's "online" column means something. */

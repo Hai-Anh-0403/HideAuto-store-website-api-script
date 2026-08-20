@@ -1,9 +1,11 @@
 import {
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConflictError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { PackagingService } from './packaging.service';
@@ -58,15 +60,42 @@ export class BuildsService {
       throw new NotFoundException('Script not found');
     }
 
-    // Find the latest APPROVED version for this script
+    // Which version to package: the seller's pick, else the one the listing sells today,
+    // else the newest approved. A seller shipping a fix to an older line needs the choice.
     const approvedVersion = await this.prisma.scriptVersion.findFirst({
-      where: { scriptId, status: 'APPROVED' },
+      where: {
+        scriptId,
+        status: 'APPROVED',
+        // No pick ⇒ the version the listing sells today, and only if that one is approved.
+        id: dto.versionId ?? script.latestVersionId ?? undefined,
+      },
       orderBy: { createdAt: 'desc' },
     });
 
     if (!approvedVersion) {
-      throw new BadRequestException(
-        'Script has no approved version to build from',
+      throw new ConflictError(
+        'version_not_approved',
+        dto.versionId
+          ? 'That version is not approved, so it cannot be packaged'
+          : 'This mini app has no approved version to package yet',
+      );
+    }
+
+    // Packaging the same version twice produces the same bytes and two rows the seller has
+    // to tell apart — point them at the existing one instead.
+    const existing = await this.prisma.miniAppBuild.findFirst({
+      where: {
+        scriptId,
+        scriptVersionId: approvedVersion.id,
+        platform: dto.platform ?? 'win',
+        arch: dto.arch ?? 'x64',
+        status: 'READY',
+      },
+    });
+    if (existing) {
+      throw new ConflictError(
+        'build_exists',
+        `v${approvedVersion.version} already has a ${existing.platform}/${existing.arch} package`,
       );
     }
 
@@ -116,7 +145,9 @@ export class BuildsService {
 
       return ready;
     } catch (err) {
-      const message = (err as Error).message;
+      // The portal shows this string to the seller, so take the *detail* an
+      // AppException carries — `message` on those is just "Service Unavailable Error".
+      const message = detailOf(err);
       this.logger.error(`Build ${build.id} failed: ${message}`);
       await this.prisma.miniAppBuild.update({
         where: { id: build.id },
@@ -147,4 +178,15 @@ export class BuildsService {
       body: await this.storage.readBytes(build.fileUrl),
     };
   }
+}
+
+/** The human-readable half of a thrown error: `{ detail }` for our coded exceptions. */
+function detailOf(err: unknown): string {
+  if (err instanceof HttpException) {
+    const body = err.getResponse();
+    if (typeof body === 'string') return body;
+    const detail = (body as { detail?: unknown }).detail;
+    if (typeof detail === 'string') return detail;
+  }
+  return err instanceof Error ? err.message : String(err);
 }

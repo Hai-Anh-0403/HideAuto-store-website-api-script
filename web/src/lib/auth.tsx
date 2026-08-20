@@ -24,6 +24,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const logout = useCallback(() => {
+    // Tell the API first so the session row goes away and the token stops working. Best
+    // effort: an unreachable API must never trap the user in a signed-in shell, and the
+    // call is pointless anyway when the token is already invalid.
+    if (getToken()) {
+      void api.post('/auth/logout').catch(() => undefined)
+    }
     setToken(null)
     setTokenState(null)
     setSeller(null)

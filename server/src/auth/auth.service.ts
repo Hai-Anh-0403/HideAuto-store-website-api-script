@@ -12,6 +12,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
+/** What the portal shows in the "devices" table, derived from the browser's own claim. */
+export interface SessionContext {
+  userAgent?: string;
+  ip?: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -20,7 +26,7 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  async loginSeller(dto: LoginDto) {
+  async loginSeller(dto: LoginDto, context: SessionContext = {}) {
     const seller = await this.prisma.seller.findUnique({
       where: { email: dto.email },
     });
@@ -40,47 +46,15 @@ export class AuthService {
       );
     }
 
-    if (seller.status === 'REJECTED') {
-      throw new ForbiddenError(
-        'seller_rejected',
-        'This seller account was rejected',
-      );
-    }
-    if (seller.status === 'SUSPENDED') {
-      throw new ForbiddenError(
-        'seller_suspended',
-        'This seller account is suspended',
-      );
-    }
+    // A rejected or suspended seller is deliberately still allowed in. The portal is
+    // read-only for them anyway — `ApprovedSellerGuard` blocks everything that sells — and
+    // signing them out at the door meant the admin's reason, which is written precisely so
+    // they know what to fix, could never reach them.
 
-    const jti = crypto.randomUUID();
-    const expiresIn = this.config.get<string>('JWT_EXPIRES_IN', '7d');
-    const expiresAt = new Date(
-      Date.now() + this.parseDuration(expiresIn),
-    );
-
-    const token = this.jwt.sign({
-      sub: `seller:${seller.id}`,
-      role: 'seller',
-      jti,
-    });
-
-    await this.prisma.sellerSession.create({
-      data: {
-        sellerId: seller.id,
-        jti,
-        expiresAt,
-      },
-    });
-
-    return {
-      access_token: token,
-      token_type: 'bearer' as const,
-      role: 'seller' as const,
-    };
+    return this.issueSellerSession(seller.id, context);
   }
 
-  async registerSeller(dto: RegisterDto) {
+  async registerSeller(dto: RegisterDto, context: SessionContext = {}) {
     const existing = await this.prisma.seller.findUnique({
       where: { email: dto.email },
     });
@@ -101,23 +75,34 @@ export class AuthService {
       },
     });
 
+    return this.issueSellerSession(seller.id, context);
+  }
+
+  /**
+   * Mint a seller token and the session row that keeps it alive.
+   *
+   * The row is not bookkeeping: `JwtStrategy` refuses any seller token whose session is
+   * gone, which is what makes "sign this device out" actually cut the device off.
+   */
+  private async issueSellerSession(sellerId: string, context: SessionContext) {
     const jti = crypto.randomUUID();
     const expiresIn = this.config.get<string>('JWT_EXPIRES_IN', '7d');
-    const expiresAt = new Date(
-      Date.now() + this.parseDuration(expiresIn),
-    );
+    const expiresAt = new Date(Date.now() + this.parseDuration(expiresIn));
 
     const token = this.jwt.sign({
-      sub: `seller:${seller.id}`,
+      sub: `seller:${sellerId}`,
       role: 'seller',
       jti,
     });
 
     await this.prisma.sellerSession.create({
       data: {
-        sellerId: seller.id,
+        sellerId,
         jti,
         expiresAt,
+        device: describeDevice(context.userAgent),
+        userAgent: context.userAgent?.slice(0, 500),
+        ip: context.ip,
       },
     });
 
@@ -126,6 +111,11 @@ export class AuthService {
       token_type: 'bearer' as const,
       role: 'seller' as const,
     };
+  }
+
+  /** Drop the session behind the caller's own token. Signing out twice is not an error. */
+  async logout(jti: string): Promise<void> {
+    await this.prisma.sellerSession.deleteMany({ where: { jti } });
   }
 
   async loginAdmin(dto: LoginDto) {
@@ -187,4 +177,42 @@ export class AuthService {
         return 7 * 24 * 60 * 60 * 1000;
     }
   }
+}
+
+/**
+ * A short, human name for the device behind a user agent — "Chrome · Windows".
+ *
+ * Deliberately crude: the seller only needs enough to recognise "that is my laptop" or
+ * "that is not mine" in the sessions table. The raw user agent is stored alongside it for
+ * anyone who needs the details.
+ */
+function describeDevice(userAgent?: string): string | null {
+  if (!userAgent) return null;
+
+  const browser = /Edg\//.test(userAgent)
+    ? 'Edge'
+    : /OPR\/|Opera/.test(userAgent)
+      ? 'Opera'
+      : /Firefox\//.test(userAgent)
+        ? 'Firefox'
+        : /Chrome\//.test(userAgent)
+          ? 'Chrome'
+          : /Safari\//.test(userAgent)
+            ? 'Safari'
+            : null;
+
+  const os = /Windows/.test(userAgent)
+    ? 'Windows'
+    : /Macintosh|Mac OS X/.test(userAgent)
+      ? 'macOS'
+      : /Android/.test(userAgent)
+        ? 'Android'
+        : /iPhone|iPad/.test(userAgent)
+          ? 'iOS'
+          : /Linux/.test(userAgent)
+            ? 'Linux'
+            : null;
+
+  const parts = [browser, os].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
 }

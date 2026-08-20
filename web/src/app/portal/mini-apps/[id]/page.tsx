@@ -2,17 +2,20 @@
 
 import { Fragment, useState, type FormEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { Pager } from '@/components/Pager'
 import { Pill } from '@/components/Pill'
+import { useConfirm } from '@/components/Confirm'
 import { TagPicker } from '@/components/TagPicker'
 import { useToast } from '@/components/Toast'
 import { useI18n } from '@/i18n'
 import { api } from '@/lib/api'
+import { copyText } from '@/lib/clipboard'
 import { useErrorText } from '@/lib/errors'
 import {
   buildStatus,
   fmtBytes,
   fmtWhen,
-  keyStatus,
+  keyState,
   nextVersion,
   scriptStatus,
   versionStatus,
@@ -30,6 +33,8 @@ import type {
 
 type Tab = 'ov' | 'ver' | 'keys' | 'mini'
 
+const KEY_PAGE_SIZE = 20
+
 export default function MiniAppDetailPage() {
   const params = useParams()
   const id = (params.id as string) ?? ''
@@ -37,16 +42,22 @@ export default function MiniAppDetailPage() {
   const { t } = useI18n()
   const errorText = useErrorText()
   const router = useRouter()
+  const confirm = useConfirm()
   const [tab, setTab] = useState<Tab>('ov')
+  const [keySkip, setKeySkip] = useState(0)
+  const [buildSkip, setBuildSkip] = useState(0)
 
   const script = useFetch(
     () => api.get<ScriptDetail>(`/scripts/${id}`),
     `script:${id}`,
   )
-  const keys = useFetch(() => api.get<Page<KeyItem>>(`/keys?scriptId=${id}`), `keys:${id}`)
+  const keys = useFetch(
+    () => api.get<Page<KeyItem>>(`/keys?scriptId=${id}&skip=${keySkip}&limit=${KEY_PAGE_SIZE}`),
+    `keys:${id}:${keySkip}`,
+  )
   const builds = useFetch(
-    () => api.get<Page<MiniAppBuild>>(`/scripts/${id}/builds`),
-    `builds:${id}`,
+    () => api.get<Page<MiniAppBuild>>(`/scripts/${id}/builds?skip=${buildSkip}&limit=${KEY_PAGE_SIZE}`),
+    `builds:${id}:${buildSkip}`,
   )
 
   const run = async (action: () => Promise<string>) => {
@@ -89,14 +100,21 @@ export default function MiniAppDetailPage() {
           {s.status === 'DRAFT' ? (
             <button
               className="btn bad sm"
-              onClick={() => {
-                if (!window.confirm(t('upload.discardConfirm'))) return
-                void run(async () => {
-                  await api.del(`/scripts/${s.id}`)
-                  router.push('/portal/mini-apps')
-                  return t('upload.discarded')
+              onClick={() =>
+                void confirm({
+                  title: t('upload.discard'),
+                  body: t('upload.discardConfirm'),
+                  confirmLabel: t('upload.discard'),
+                  danger: true,
+                }).then(({ ok }) => {
+                  if (!ok) return
+                  void run(async () => {
+                    await api.del(`/scripts/${s.id}`)
+                    router.push('/portal/mini-apps')
+                    return t('upload.discarded')
+                  })
                 })
-              }}
+              }
             >
               {t('upload.discard')}
             </button>
@@ -116,14 +134,21 @@ export default function MiniAppDetailPage() {
           ) : (
             <button
               className="btn bad sm"
-              onClick={() => {
-                if (!window.confirm(t('detail.archiveConfirm', { name: s.name }))) return
-                void run(async () => {
-                  await api.post(`/scripts/${s.id}/archive`)
-                  script.reload()
-                  return t('detail.archived', { name: s.name })
+              onClick={() =>
+                void confirm({
+                  title: t('detail.archive'),
+                  body: t('detail.archiveConfirm', { name: s.name }),
+                  confirmLabel: t('detail.archive'),
+                  danger: true,
+                }).then(({ ok }) => {
+                  if (!ok) return
+                  void run(async () => {
+                    await api.post(`/scripts/${s.id}/archive`)
+                    script.reload()
+                    return t('detail.archived', { name: s.name })
+                  })
                 })
-              }}
+              }
             >
               {t('detail.archive')}
             </button>
@@ -170,18 +195,61 @@ export default function MiniAppDetailPage() {
           }
         />
       )}
-      {tab === 'ver' && <DetailVersions s={s} onUploaded={() => script.reload()} />}
+      {tab === 'ver' && (
+        <DetailVersions
+          s={s}
+          onUploaded={() => script.reload()}
+          onRollback={(version) =>
+            void confirm({
+              title: t('versions.rollback'),
+              body: t('versions.rollbackConfirm', { version: version.version }),
+              confirmLabel: t('versions.rollback'),
+            }).then(({ ok }) => {
+              if (!ok) return
+              void run(async () => {
+                await api.post(`/scripts/${s.id}/versions/${version.id}/rollback`)
+                script.reload()
+                return t('versions.rolledBack', { version: version.version })
+              })
+            })
+          }
+          onDelete={(version) =>
+            void confirm({
+              title: t('versions.delete'),
+              body: t('versions.deleteConfirm', { version: version.version }),
+              confirmLabel: t('versions.delete'),
+              danger: true,
+            }).then(({ ok }) => {
+              if (!ok) return
+              void run(async () => {
+                await api.del(`/scripts/${s.id}/versions/${version.id}`)
+                script.reload()
+                return t('versions.deleted', { version: version.version })
+              })
+            })
+          }
+        />
+      )}
       {tab === 'keys' && (
         <DetailKeys
           scriptName={s.name}
           keys={keys.data?.items ?? []}
+          total={keys.data?.total ?? 0}
+          skip={keySkip}
+          onSkip={setKeySkip}
           loading={keys.loading}
           error={keys.error}
+          onCopy={(value, message) =>
+            void copyText(value).then((ok) => toast(ok ? message : t('keys.copyFailed')))
+          }
           onCreate={(payload) =>
             run(async () => {
-              const key = await api.post<KeyItem>(`/keys/scripts/${s.id}/keys`, payload)
+              const made = await api.post<KeyItem[]>('/keys', { ...payload, scriptId: s.id })
+              setKeySkip(0)
               keys.reload()
-              return t('detailKeys.created', { key: key.key })
+              return made.length === 1
+                ? t('detailKeys.created', { key: made[0].key })
+                : t('keys.created', { count: made.length })
             })
           }
           onRevoke={(keyId) =>
@@ -196,17 +264,35 @@ export default function MiniAppDetailPage() {
       {tab === 'mini' && (
         <DetailPackaging
           builds={builds.data?.items ?? []}
+          total={builds.data?.total ?? 0}
+          skip={buildSkip}
+          onSkip={setBuildSkip}
+          versions={s.versions.filter((v) => v.status === 'APPROVED')}
+          liveVersionId={s.latestVersionId}
           loading={builds.loading}
           error={builds.error}
-          onBuild={() =>
+          onBuild={(versionId) =>
             run(async () => {
-              await api.post<MiniAppBuild>(`/scripts/${s.id}/builds`, {})
+              await api.post<MiniAppBuild>(
+                `/scripts/${s.id}/builds`,
+                versionId ? { versionId } : {},
+              )
+              setBuildSkip(0)
               builds.reload()
               script.reload()
               return t('packaging.built')
             })
           }
-          onDownload={() =>
+          onDownload={(build) =>
+            run(async () => {
+              await api.download(
+                `/scripts/${s.id}/builds/${build.id}/download`,
+                `${s.slug}-${build.appVersion}.zip`,
+              )
+              return t('packaging.downloading')
+            })
+          }
+          onDownloadGraph={() =>
             run(async () => {
               await api.download(`/scripts/${s.id}/download`, `${s.slug}.json`)
               return t('packaging.downloading')
@@ -409,7 +495,18 @@ function Moderation({ s, latest, onSubmit }: { s: ScriptDetail; latest: ScriptVe
 
 /* ---------- Versions tab ---------- */
 
-function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => void }) {
+function DetailVersions({
+  s,
+  onUploaded,
+  onRollback,
+  onDelete,
+}: {
+  s: ScriptDetail
+  onUploaded: () => void
+  /** Point the listing back at an older approved version. */
+  onRollback: (version: ScriptVersion) => void
+  onDelete: (version: ScriptVersion) => void
+}) {
   const { toast } = useToast()
   const { t, lang } = useI18n()
   const errorText = useErrorText()
@@ -417,6 +514,7 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
   const [file, setFile] = useState<File | null>(null)
   const [version, setVersion] = useState(nextVersion(s.latestVersion))
   const [changelog, setChangelog] = useState('')
+  const [minApp, setMinApp] = useState(s.minAppVersion ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
@@ -437,6 +535,7 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
     form.append('file', file)
     form.append('version', version)
     if (changelog) form.append('changelog', changelog)
+    if (minApp) form.append('minAppVersion', minApp)
     try {
       const result = await api.upload<ScriptVersion>(`/scripts/${s.id}/versions`, form)
       toast(t('versions.uploaded', { version: result.version }))
@@ -470,6 +569,18 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
               <input className="input" value={changelog} onChange={(e) => setChangelog(e.target.value)} />
             </label>
           </div>
+          <div className="grid2">
+            <label className="field">
+              <span>{t('upload.minApp')}</span>
+              <input
+                className="input mono"
+                value={minApp}
+                onChange={(e) => setMinApp(e.target.value)}
+                placeholder={t('upload.minAppPlaceholder')}
+                pattern="\d+\.\d+\.\d+"
+              />
+            </label>
+          </div>
           <button className="btn pri sm" type="submit" disabled={busy || !file}>
             {busy ? t('versions.scanning') : t('versions.submit')}
           </button>
@@ -487,6 +598,7 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
                 <th className="opt">{t('versions.col.minApp')}</th>
                 <th>{t('versions.col.status')}</th>
                 <th className="opt">{t('versions.col.date')}</th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -510,10 +622,22 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
                       <td className="tnum u-sub opt">{v.minAppVersion ?? '—'}</td>
                       <td><Pill tone={vs.tone}>{t(vs.key)}</Pill></td>
                       <td className="u-sub tnum opt">{fmtWhen(v.createdAt, lang, t('time.now'))}</td>
+                      <td className="rowbtns">
+                        {v.status === 'APPROVED' && v.id !== s.latestVersionId && (
+                          <button className="btn sm" onClick={() => onRollback(v)}>
+                            {t('versions.rollback')}
+                          </button>
+                        )}
+                        {v.status !== 'APPROVED' && v.id !== s.latestVersionId && (
+                          <button className="btn bad sm" onClick={() => onDelete(v)}>
+                            {t('versions.delete')}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                     {open.has(v.id) && (
                       <tr>
-                        <td colSpan={5} style={{ background: 'var(--surface-2)', padding: '6px 16px 12px' }}>
+                        <td colSpan={6} style={{ background: 'var(--surface-2)', padding: '6px 16px 12px' }}>
                           <div className="kv">
                             <span className="klab">{t('versions.moderation')}</span>
                             {!v.graphExtracted ? (
@@ -554,7 +678,7 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
                   </Fragment>
                 )
               }) : (
-                <tr><td colSpan={5} className="u-sub" style={{ padding: '18px 16px' }}>{t('versions.empty')}</td></tr>
+                <tr><td colSpan={6} className="u-sub" style={{ padding: '18px 16px' }}>{t('versions.empty')}</td></tr>
               )}
             </tbody>
           </table>
@@ -567,24 +691,71 @@ function DetailVersions({ s, onUploaded }: { s: ScriptDetail; onUploaded: () => 
 
 /* ---------- Keys tab ---------- */
 
-function DetailKeys({ scriptName, keys, loading, error, onCreate, onRevoke }: {
-  scriptName: string; keys: KeyItem[]; loading: boolean; error: string | null
-  onCreate: (payload: KeyCreate) => void; onRevoke: (keyId: string) => void
+function DetailKeys({
+  scriptName,
+  keys,
+  total,
+  skip,
+  onSkip,
+  loading,
+  error,
+  onCopy,
+  onCreate,
+  onRevoke,
+}: {
+  scriptName: string
+  keys: KeyItem[]
+  total: number
+  skip: number
+  onSkip: (skip: number) => void
+  loading: boolean
+  error: string | null
+  onCopy: (value: string, message: string) => void
+  onCreate: (payload: KeyCreate) => void
+  onRevoke: (keyId: string) => void
 }) {
   const { t } = useI18n()
   const [label, setLabel] = useState('')
+  const [quantity, setQuantity] = useState('1')
   const [maxUses, setMaxUses] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
 
+  const count = Math.min(Math.max(parseInt(quantity, 10) || 1, 1), 200)
+
   const create = (e: FormEvent) => {
     e.preventDefault()
-    onCreate({ label: label || null, maxUses: maxUses ? Number(maxUses) : null, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null })
-    setLabel(''); setMaxUses(''); setExpiresAt('')
+    onCreate({
+      label: label.trim() || undefined,
+      maxUses: maxUses ? Number(maxUses) : undefined,
+      // `datetime-local` carries no timezone; Date then toISOString hands the API UTC.
+      expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+      quantity: count,
+    })
+    setLabel('')
+    setQuantity('1')
+    setMaxUses('')
+    setExpiresAt('')
   }
 
   return (
     <div className="card">
-      <div className="card-h"><h3>{t('detailKeys.title')}</h3></div>
+      <div className="card-h">
+        <h3>{t('detailKeys.title')}</h3>
+        <div className="sp" />
+        {keys.length > 0 && (
+          <button
+            className="btn sm"
+            onClick={() =>
+              onCopy(
+                keys.map((k) => k.key).join('\n'),
+                t('keys.copiedAll', { count: keys.length }),
+              )
+            }
+          >
+            {t('keys.copyAll')}
+          </button>
+        )}
+      </div>
       <form onSubmit={create} style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
         <div className="grid2">
           <label className="field">
@@ -592,20 +763,24 @@ function DetailKeys({ scriptName, keys, loading, error, onCreate, onRevoke }: {
             <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('detailKeys.labelPlaceholder')} maxLength={100} />
           </label>
           <label className="field">
-            <span>{t('detailKeys.maxUses')}</span>
-            <input className="input tnum" type="number" min={1} value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder={t('detailKeys.maxUsesPlaceholder')} />
+            <span>{t('keys.form.quantity')}</span>
+            <input className="input tnum" type="number" min={1} max={200} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
           </label>
         </div>
         <div className="grid2">
+          <label className="field">
+            <span>{t('detailKeys.maxUses')}</span>
+            <input className="input tnum" type="number" min={1} value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder={t('detailKeys.maxUsesPlaceholder')} />
+          </label>
           <label className="field">
             <span>{t('detailKeys.expires')}</span>
             <input className="input" type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
           </label>
         </div>
-        <button className="btn pri sm" type="submit">{t('detailKeys.create')}</button>
+        <button className="btn pri sm" type="submit">{t('keys.form.submit', { count })}</button>
       </form>
       {error && <div className="state bad">{error}</div>}
-      {loading ? (
+      {loading && !keys.length ? (
         <><div className="skel" /><div className="skel" /><div className="skel" /></>
       ) : !keys.length ? (
         <div className="empty">
@@ -627,10 +802,19 @@ function DetailKeys({ scriptName, keys, loading, error, onCreate, onRevoke }: {
             </thead>
             <tbody>
               {keys.map((k) => {
-                const ks = keyStatus[k.status]
+                const ks = keyState[k.state]
                 return (
                   <tr key={k.id}>
-                    <td><span className="keychip">{k.key}</span></td>
+                    <td>
+                      <button
+                        className="keychip"
+                        title={t('keys.copy')}
+                        style={{ cursor: 'pointer', border: 0 }}
+                        onClick={() => onCopy(k.key, t('keys.copied'))}
+                      >
+                        {k.key}
+                      </button>
+                    </td>
                     <td>
                       {k.label ?? '—'}
                       {k.expiresAt && <div className="u-sub">{t('detailKeys.expires')}: {new Date(k.expiresAt).toLocaleString()}</div>}
@@ -647,6 +831,7 @@ function DetailKeys({ scriptName, keys, loading, error, onCreate, onRevoke }: {
           </table>
         </div>
       )}
+      <Pager skip={skip} limit={KEY_PAGE_SIZE} total={total} onChange={onSkip} />
       <div className="card-foot"><span className="note">{t('detailKeys.foot', { name: scriptName })}</span></div>
     </div>
   )
@@ -654,16 +839,66 @@ function DetailKeys({ scriptName, keys, loading, error, onCreate, onRevoke }: {
 
 /* ---------- Packaging tab ---------- */
 
-function DetailPackaging({ builds, loading, error, onBuild, onDownload }: {
-  builds: MiniAppBuild[]; loading: boolean; error: string | null; onBuild: () => void; onDownload: () => void
+function DetailPackaging({
+  builds,
+  total,
+  skip,
+  onSkip,
+  versions,
+  liveVersionId,
+  loading,
+  error,
+  onBuild,
+  onDownload,
+  onDownloadGraph,
+}: {
+  builds: MiniAppBuild[]
+  total: number
+  skip: number
+  onSkip: (skip: number) => void
+  /** Approved versions — the only ones that may be packaged. */
+  versions: ScriptVersion[]
+  liveVersionId: string | null
+  loading: boolean
+  error: string | null
+  onBuild: (versionId: string) => void
+  /** The packaged .zip of one build — what a buyer would install. */
+  onDownload: (build: MiniAppBuild) => void
+  /** The scrubbed graph, for importing back into the desktop app. */
+  onDownloadGraph: () => void
 }) {
   const { t } = useI18n()
+  const [versionId, setVersionId] = useState(liveVersionId ?? versions[0]?.id ?? '')
+
   return (
     <div className="card">
       <div className="card-h">
         <h3>{t('packaging.title')}</h3>
         <div className="sp" />
-        <button className="btn pri sm" onClick={onBuild}>{t('packaging.build')}</button>
+        <button className="btn sm" onClick={onDownloadGraph}>{t('packaging.downloadGraph')}</button>
+        {versions.length > 0 && (
+          <select
+            className="input"
+            style={{ width: 'auto', marginLeft: 8 }}
+            value={versionId}
+            onChange={(e) => setVersionId(e.target.value)}
+          >
+            {versions.map((v) => (
+              <option key={v.id} value={v.id}>
+                v{v.version}
+                {v.id === liveVersionId ? ` · ${t('versions.live')}` : ''}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          className="btn pri sm"
+          style={{ marginLeft: 8 }}
+          disabled={!versions.length}
+          onClick={() => onBuild(versionId)}
+        >
+          {t('packaging.build')}
+        </button>
       </div>
       {error && <div className="state bad">{error}</div>}
       {loading ? (
@@ -692,9 +927,14 @@ function DetailPackaging({ builds, loading, error, onBuild, onDownload }: {
                       <Pill tone="neutral">{t(b.builtBy === 'server' ? 'packaging.builtBy.server' : 'packaging.builtBy.agent')}</Pill>
                     </td>
                     <td className="tnum u-sub opt">{fmtBytes(b.sizeBytes)}</td>
-                    <td><Pill tone={bs.tone}>{t(bs.key)}</Pill></td>
+                    <td>
+                      <Pill tone={bs.tone}>{t(bs.key)}</Pill>
+                      {b.status === 'FAILED' && b.error && (
+                        <div className="u-sub">{b.error}</div>
+                      )}
+                    </td>
                     <td className="rowbtns">
-                      <button className="btn sm" disabled={b.status !== 'READY'} onClick={onDownload}>{t('packaging.download')}</button>
+                      <button className="btn sm" disabled={b.status !== 'READY'} onClick={() => onDownload(b)}>{t('packaging.download')}</button>
                     </td>
                   </tr>
                 )
@@ -705,6 +945,7 @@ function DetailPackaging({ builds, loading, error, onBuild, onDownload }: {
       ) : (
         <div style={{ padding: '22px 16px' }} className="u-sub">{t('packaging.empty')}</div>
       )}
+      <Pager skip={skip} limit={KEY_PAGE_SIZE} total={total} onChange={onSkip} />
       <div className="card-foot"><span className="note">{t('packaging.foot')}</span></div>
     </div>
   )

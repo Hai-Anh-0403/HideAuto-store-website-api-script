@@ -5,6 +5,8 @@ export type ScriptStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED'
 export type VersionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED'
 export type BuildStatus = 'BUILDING' | 'READY' | 'FAILED'
 export type KeyStatus = 'ACTIVE' | 'REVOKED'
+/** What the key can actually do now — expiry and exhaustion are derived, not stored. */
+export type KeyState = 'ACTIVE' | 'REVOKED' | 'EXPIRED' | 'EXHAUSTED'
 export type MemberStatus = 'ACTIVE' | 'BLOCKED'
 
 export interface Page<T> {
@@ -26,6 +28,8 @@ export interface Seller {
   name: string
   contact: string | null
   status: SellerStatus
+  /** Why the admin rejected or suspended the account. Null while nothing is wrong. */
+  statusReason: string | null
   createdAt: string
   updatedAt: string
 }
@@ -35,7 +39,8 @@ export interface SellerSession {
   device: string | null
   userAgent: string | null
   ip: string | null
-  current?: boolean
+  /** True for the session this browser is holding — it cannot sign itself out by mistake. */
+  current: boolean
   createdAt: string
   lastSeenAt: string
   expiresAt: string
@@ -153,24 +158,82 @@ export interface ScriptInspect {
   usesShell: boolean
 }
 
+/* ---------- Admin console ---------- */
+
+export interface AdminSeller {
+  id: string
+  email: string
+  name: string
+  contact: string | null
+  status: SellerStatus
+  statusReason: string | null
+  createdAt: string
+  updatedAt: string
+  _count: { scripts: number; members: number; keys: number }
+}
+
+/** The version waiting for review, with everything the decision depends on. */
+export interface PendingVersion {
+  id: string
+  version: string
+  changelog: string | null
+  nodeCount: number
+  nodeGroupsUsed: string[]
+  capabilities: Capabilities
+  scan: GraphScan
+  graphExtracted: boolean
+  delivery: string
+  sourceFilename: string | null
+  minAppVersion: string | null
+  createdAt: string
+}
+
+export interface PendingScript extends Script {
+  seller: { id: string; name: string; email: string; status: SellerStatus }
+  versions: PendingVersion[]
+}
+
 export interface KeyItem {
   id: string
   sellerId: string
-  scriptId: string
+  /** null = shop-wide key: it unlocks every app from this seller. */
+  scriptId: string | null
   key: string
   label: string | null
   status: KeyStatus
+  /** Derived by the API: ACTIVE only when it is still redeemable right now. */
+  state: KeyState
   maxUses: number | null
   usedCount: number
   expiresAt: string | null
   createdAt: string
-  script: { id: string; name: string; slug: string }
+  script: { id: string; name: string; slug: string } | null
 }
 
 export interface KeyCreate {
+  /** Omit for a shop-wide key that unlocks every app from this seller. */
+  scriptId?: string | null
+  label?: string
+  maxUses?: number
+  expiresAt?: string
+  quantity?: number
+}
+
+export interface KeyUpdate {
+  /** null clears the field: no label / unlimited uses / never expires. */
   label?: string | null
   maxUses?: number | null
   expiresAt?: string | null
+}
+
+export interface KeyStats {
+  total: number
+  active: number
+  revoked: number
+  expired: number
+  exhausted: number
+  /** Total redemptions across every key, including revoked ones. */
+  redemptions: number
 }
 
 export interface Member {
@@ -184,6 +247,26 @@ export interface Member {
   lastSeenAt: string | null
   blockedDevices: string[]
   redeemedAt: string
+  /** Keys this buyer redeemed, newest first — how they got in. */
+  keys: MemberKeyRef[]
+}
+
+export interface MemberKeyRef {
+  id: string
+  key: string
+  label: string | null
+  redeemedAt: string
+}
+
+/** One machine a buyer has activated a packaged mini app on. */
+export interface MemberDevice {
+  id: string
+  machineId: string
+  scriptId: string | null
+  activationCount: number
+  firstSeenAt: string
+  lastSeenAt: string
+  blocked: boolean
 }
 
 export interface MiniAppBuild {

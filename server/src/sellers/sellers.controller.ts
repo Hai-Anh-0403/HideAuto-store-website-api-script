@@ -45,7 +45,7 @@ export class SellersController {
   @Get('me/sessions')
   @ApiOperation({ summary: 'List active sessions' })
   async getSessions(@CurrentUser() user: RequestUser) {
-    return this.sellersService.getSessions(user.id);
+    return this.sellersService.getSessions(user.id, user.jti);
   }
 
   @Delete('me/sessions/:id')

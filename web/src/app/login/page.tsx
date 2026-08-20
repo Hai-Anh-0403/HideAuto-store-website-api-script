@@ -220,6 +220,11 @@ export default function LoginPage() {
                     : t('login.signUp')}
               </button>
             </form>
+            <div className="note" style={{ marginTop: 12, textAlign: 'center' }}>
+              {/* The review console is a different identity system; sellers never need it,
+                  but an admin has to be able to find it without being told a URL. */}
+              <a href="/admin">{t('login.adminLink')}</a>
+            </div>
           </div>
         </div>
       </div>

@@ -15,6 +15,7 @@ import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SellerAuthGuard } from '../auth/seller-auth.guard';
+import { ApprovedSellerGuard } from '../auth/approved-seller.guard';
 import {
   CurrentUser,
   RequestUser,
@@ -25,7 +26,7 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 
 @ApiTags('Builds')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SellerAuthGuard)
+@UseGuards(JwtAuthGuard, SellerAuthGuard, ApprovedSellerGuard)
 @Controller('api/v1/scripts/:scriptId/builds')
 export class BuildsController {
   constructor(private readonly buildsService: BuildsService) {}

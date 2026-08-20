@@ -6,12 +6,14 @@
  *
  * Idempotent: every write is an upsert, so it is safe to run on every boot. An existing
  * admin keeps its current password; this never resets one.
+ *
+ * This creates an **admin**, which the seller portal cannot log in with — the portal's
+ * login form calls the seller endpoint. For an account that actually opens the portal,
+ * register one at http://localhost:3000, or run `pnpm db:seed:demo` (see `seed-demo.ts`).
  */
 
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-
-const prisma = new PrismaClient();
 
 const TAGS = [
   { name: 'Social', slug: 'social', color: '#6366f1' },
@@ -25,7 +27,7 @@ const TAGS = [
 /** Defaulted in compose for a working local stack — never acceptable in production. */
 const INSECURE_DEFAULT_PASSWORD = 'admin12345';
 
-async function seedTags(): Promise<number> {
+export async function seedTags(prisma: PrismaClient): Promise<number> {
   for (const tag of TAGS) {
     await prisma.tag.upsert({
       where: { slug: tag.slug },
@@ -36,7 +38,7 @@ async function seedTags(): Promise<number> {
   return TAGS.length;
 }
 
-async function seedAdmin(): Promise<string> {
+async function seedAdmin(prisma: PrismaClient): Promise<string> {
   const email = process.env.ADMIN_EMAIL;
   const password = process.env.ADMIN_PASSWORD;
 
@@ -63,14 +65,24 @@ async function seedAdmin(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const tags = await seedTags();
-  const admin = await seedAdmin();
-  console.log(`[seed] ${tags} tags ready · ${admin}`);
+  const prisma = new PrismaClient();
+  try {
+    const tags = await seedTags(prisma);
+    const admin = await seedAdmin(prisma);
+    console.log(`[seed] ${tags} tags ready · ${admin}`);
+    console.log(
+      '[seed] note: an admin cannot sign in to the seller portal — ' +
+        'register a seller at http://localhost:3000, or run `pnpm db:seed:demo`.',
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
-main()
-  .catch((err: unknown) => {
+// Only when run directly: `seed-demo.ts` imports `seedTags` and must not trigger this.
+if (require.main === module) {
+  main().catch((err: unknown) => {
     console.error('[seed] failed:', err);
     process.exitCode = 1;
-  })
-  .finally(() => void prisma.$disconnect());
+  });
+}

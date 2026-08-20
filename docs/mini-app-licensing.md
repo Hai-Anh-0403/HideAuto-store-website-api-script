@@ -39,6 +39,12 @@ hai mật khẩu. Muốn kích hoạt mini app, buyer **phải có tài khoản 
 Redeem xong thì quyền nằm ở `seller_members.script_ids` — xem
 [script-publish-packaging.md §6.2](./script-publish-packaging.md#62-khóa--quyền-truy-cập).
 
+Mã key có dạng `SK-XXXXX-XXXXX-XXXXX-XXXXX` (~98 bit, bảng chữ bỏ `0/O/1/I/L/U` cho dễ đọc lại).
+Ô nhập key nên gửi nguyên chuỗi người dùng gõ: server thử đúng chuỗi đã lưu trước, rồi mới tới dạng
+chuẩn hoá (bỏ dấu gạch/khoảng trắng, viết hoa), nên gõ thường hay thiếu gạch vẫn nhận. Key hex 32 ký
+tự phát trước đây vẫn dùng được. Ai đã dùng key nào thì ghi ở `key_redemptions`; máy đã kích hoạt ghi
+ở `member_devices` và là nguồn của danh sách chặn theo máy.
+
 | | Trước | Sau khi có licence |
 |---|---|---|
 | Tải gói về | cần key | cần key |

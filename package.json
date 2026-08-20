@@ -12,7 +12,9 @@
     "db:push": "pnpm --filter server db:push",
     "db:migrate": "pnpm --filter server db:migrate",
     "db:studio": "pnpm --filter server db:studio",
-    "db:seed": "pnpm --filter server db:seed"
+    "db:seed": "pnpm --filter server db:seed",
+    "db:seed:demo": "pnpm --filter server db:seed:demo",
+    "db:seed:demo:clear": "pnpm --filter server db:seed:demo:clear"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

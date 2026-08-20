@@ -275,6 +275,26 @@ textarea.input { height: auto; min-height: 84px; padding: 8px 10px; line-height:
 @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
 
 /* Signed-out screen */
+/* ── Confirm dialog ─────────────────────────────────────────────────────
+   In-app, because `window.confirm` is dead in an embedded browser: it returns false
+   without drawing anything, which made every destructive button look broken. */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 50;
+  display: grid; place-items: center; padding: 24px;
+  background: rgba(0, 0, 0, 0.5);
+}
+.modal {
+  width: min(440px, 100%);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  padding: 18px;
+}
+.modal h3 { margin: 0 0 6px; font-size: 15px; }
+.modal p { margin: 0; line-height: 1.5; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
 .login { min-height: 100dvh; display: grid; place-items: center; padding: 32px 16px; }
 .login-shell { width: min(400px, 100%); }
 .login-panel { width: 100%; }

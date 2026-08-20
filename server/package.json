@@ -8,13 +8,16 @@
     "start": "node dist/main",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\"",
-    "test": "pnpm test:graph && pnpm test:license",
+    "test": "pnpm test:graph && pnpm test:license && pnpm test:keys",
     "test:graph": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/workflow-graph.test.ts",
     "test:license": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/license.test.ts",
+    "test:keys": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/key-code.test.ts",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed.ts"
+    "db:seed": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed.ts",
+    "db:seed:demo": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-demo.ts",
+    "db:seed:demo:clear": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-demo.ts --clear"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

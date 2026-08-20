@@ -38,6 +38,8 @@ model Seller {
   password  String
   contact   String?
   status    SellerStatus @default(PENDING)
+  /// Why the admin rejected or suspended the account — shown to the seller on sign-in.
+  statusReason String?   @map("status_reason")
   createdAt DateTime     @default(now()) @map("created_at")
   updatedAt DateTime     @updatedAt @map("updated_at")
 
@@ -190,8 +192,11 @@ model SellerKey {
   sellerId String  @map("seller_id")
   seller   Seller  @relation(fields: [sellerId], references: [id])
   /// null = shop-wide key: redeeming it unlocks every app from this seller.
+  ///
+  /// ⚠ Cascade, not the default SetNull: a key whose app was deleted would otherwise turn
+  /// into a shop-wide key and quietly unlock everything the seller sells.
   scriptId String? @map("script_id")
-  script   Script? @relation(fields: [scriptId], references: [id])
+  script   Script? @relation(fields: [scriptId], references: [id], onDelete: Cascade)
 
   key       String    @unique
   label     String?
@@ -201,9 +206,33 @@ model SellerKey {
   expiresAt DateTime? @map("expires_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
+  redemptions KeyRedemption[]
+
   @@index([sellerId])
   @@index([scriptId])
   @@map("seller_keys")
+}
+
+/// Who turned a key into access, and when.
+///
+/// `SellerKey.usedCount` only ever said *how many* — which left the seller unable to answer
+/// "who used the key I sold to that reseller?". One row per (key, buyer): re-entering the
+/// same key on a new machine does not add a row, so the count of rows is the count of
+/// buyers, not of installs.
+model KeyRedemption {
+  id       String       @id @default(cuid())
+  keyId    String       @map("key_id")
+  key      SellerKey    @relation(fields: [keyId], references: [id], onDelete: Cascade)
+  memberId String       @map("member_id")
+  member   SellerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  /// What this redemption unlocked; null when the key was shop-wide.
+  scriptId  String?  @map("script_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([keyId, memberId])
+  @@index([memberId])
+  @@map("key_redemptions")
 }
 
 model SellerMember {
@@ -221,9 +250,36 @@ model SellerMember {
 
   scriptIds String[] @default([]) @map("script_ids")
 
+  redemptions KeyRedemption[]
+  devices     MemberDevice[]
+
   @@unique([sellerId, userId])
   @@index([sellerId])
   @@map("seller_members")
+}
+
+/// One machine a buyer has activated a mini app on.
+///
+/// `SellerMember.blockedDevices` decides which machine ids stop getting licences, but
+/// nothing used to *tell the seller a machine id exists* — the block list could only ever be
+/// empty. Every activation upserts its row here, so the portal can show real devices with a
+/// block button next to each.
+model MemberDevice {
+  id       String       @id @default(cuid())
+  memberId String       @map("member_id")
+  member   SellerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  machineId String @map("machine_id")
+  /// The app most recently activated from this machine.
+  scriptId  String? @map("script_id")
+
+  activationCount Int      @default(0) @map("activation_count")
+  firstSeenAt     DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt      DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([memberId, machineId])
+  @@index([memberId])
+  @@map("member_devices")
 }
 
 // ─── Mini App Builds ────────────────────────────────────────────────

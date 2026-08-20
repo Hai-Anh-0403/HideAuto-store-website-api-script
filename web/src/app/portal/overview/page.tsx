@@ -1,5 +1,6 @@
 'use client'
 
+import { PendingBanner } from '@/components/PendingBanner'
 import { Pill } from '@/components/Pill'
 import { useI18n } from '@/i18n'
 import { api } from '@/lib/api'
@@ -35,15 +36,7 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {!approved && (
-        <div className="banner warn">
-          <span className="bi">!</span>
-          <div>
-            <b>{t('common.pendingApproval.title')}</b>
-            {t('common.pendingApproval.body')}
-          </div>
-        </div>
-      )}
+      <PendingBanner />
       {error && <div className="state bad">{error}</div>}
 
       <div className="tiles">

@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Pager } from '@/components/Pager'
+import { PendingBanner } from '@/components/PendingBanner'
 import { Pill } from '@/components/Pill'
 import { TagPicker } from '@/components/TagPicker'
 import { useToast } from '@/components/Toast'
@@ -10,11 +11,24 @@ import { useI18n } from '@/i18n'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { useErrorText } from '@/lib/errors'
-import { fmtCount, scriptPill } from '@/lib/pills'
+import { fmtCount, scriptPill, scriptStatus } from '@/lib/pills'
+import { useDebounced } from '@/lib/useDebounced'
 import { useFetch } from '@/lib/useFetch'
-import type { Page, Script, ScriptInspect } from '@/types'
+import type { Page, Script, ScriptInspect, ScriptStatus } from '@/types'
 
 const PAGE_SIZE = 20
+
+/** Mirrors the API's own allow-list (server/src/scripts/dto/list-scripts.dto.ts). */
+const SCRIPT_STATUSES: ScriptStatus[] = [
+  'DRAFT',
+  'PENDING_REVIEW',
+  'PUBLISHED',
+  'REJECTED',
+  'ARCHIVED',
+]
+
+type ScriptSort = 'newest' | 'name' | 'downloads'
+const SCRIPT_SORTS: ScriptSort[] = ['newest', 'name', 'downloads']
 
 /** "gmail-auto.zip" → "gmail-auto" — a sensible default name from the filename. */
 function stripExtension(filename: string): string {
@@ -115,6 +129,9 @@ function UploadForm({
   const [inspectError, setInspectError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [shortDesc, setShortDesc] = useState('')
+  const [version, setVersion] = useState('1.0.0')
+  const [changelog, setChangelog] = useState('')
+  const [minApp, setMinApp] = useState('')
   const [tagIds, setTagIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
 
@@ -153,6 +170,9 @@ function UploadForm({
       form.append('file', file)
       form.append('name', name || file.name)
       if (shortDesc) form.append('shortDescription', shortDesc)
+      if (version) form.append('version', version)
+      if (changelog) form.append('changelog', changelog)
+      if (minApp) form.append('minAppVersion', minApp)
       if (tagIds.length) form.append('tagIds', tagIds.join(','))
 
       await api.upload('/scripts', form)
@@ -220,6 +240,35 @@ function UploadForm({
             />
           </label>
         </div>
+        <div className="grid2">
+          <label className="field">
+            <span>{t('upload.version')}</span>
+            <input
+              className="input mono"
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+              pattern="\d+\.\d+\.\d+"
+            />
+          </label>
+          <label className="field">
+            <span>{t('upload.minApp')}</span>
+            <input
+              className="input mono"
+              value={minApp}
+              onChange={(e) => setMinApp(e.target.value)}
+              placeholder={t('upload.minAppPlaceholder')}
+              pattern="\d+\.\d+\.\d+"
+            />
+          </label>
+        </div>
+        <label className="field">
+          <span>{t('versions.changelog')}</span>
+          <input
+            className="input"
+            value={changelog}
+            onChange={(e) => setChangelog(e.target.value)}
+          />
+        </label>
         <TagPicker value={tagIds} onChange={setTagIds} />
         <div className="formrow" style={{ justifyContent: 'flex-end' }}>
           <button className="btn sm" onClick={onCancel}>{t('common.cancel')}</button>
@@ -241,15 +290,37 @@ export default function MiniAppsPage() {
   const approved = seller?.status === 'APPROVED'
   const [skip, setSkip] = useState(0)
   const [showUpload, setShowUpload] = useState(false)
+  const [q, setQ] = useState('')
+  const [status, setStatus] = useState<ScriptStatus | ''>('')
+  const [sort, setSort] = useState<ScriptSort>('newest')
+
+  // The box updates on every keystroke; the request waits for a pause.
+  const search = useDebounced(q.trim())
+
+  const filter = [
+    search ? `search=${encodeURIComponent(search)}` : '',
+    status ? `status=${status}` : '',
+    sort === 'newest' ? '' : `sort=${sort}`,
+  ]
+    .filter(Boolean)
+    .join('&')
 
   const scripts = useFetch(
     () =>
       approved
-        ? api.get<Page<Script>>(`/scripts?skip=${skip}&limit=${PAGE_SIZE}`)
+        ? api.get<Page<Script>>(
+            `/scripts?skip=${skip}&limit=${PAGE_SIZE}${filter ? `&${filter}` : ''}`,
+          )
         : Promise.resolve(null),
-    `scripts:${approved}:${skip}`,
+    `scripts:${approved}:${skip}:${filter}`,
   )
   const rows = scripts.data?.items ?? []
+
+  /** Any filter change restarts at page 1 — page 3 of the old query is usually empty. */
+  const reset = <T,>(set: (value: T) => void) => (value: T) => {
+    set(value)
+    setSkip(0)
+  }
 
   return (
     <>
@@ -266,15 +337,7 @@ export default function MiniAppsPage() {
         )}
       </div>
 
-      {!approved && (
-        <div className="banner warn">
-          <span className="bi">!</span>
-          <div>
-            <b>{t('common.pendingApproval.title')}</b>
-            {t('common.pendingApproval.body')}
-          </div>
-        </div>
-      )}
+      <PendingBanner />
       {scripts.error && <div className="state bad">{scripts.error}</div>}
 
       {showUpload && (
@@ -291,11 +354,42 @@ export default function MiniAppsPage() {
         <div className="card-h">
           <h3>{t('miniApps.count', { count: scripts.data?.total ?? 0 })}</h3>
           <div className="sp" />
-          <button className="btn sm" onClick={() => scripts.reload()}>
+          <input
+            className="search"
+            placeholder={t('miniApps.search')}
+            value={q}
+            onChange={(e) => reset(setQ)(e.target.value)}
+          />
+          <select
+            className="input"
+            style={{ width: 'auto', marginLeft: 8 }}
+            value={status}
+            onChange={(e) => reset(setStatus)(e.target.value as ScriptStatus | '')}
+          >
+            <option value="">{t('miniApps.filter.anyStatus')}</option>
+            {SCRIPT_STATUSES.map((value) => (
+              <option key={value} value={value}>
+                {t(scriptStatus[value].key)}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input"
+            style={{ width: 'auto', marginLeft: 8 }}
+            value={sort}
+            onChange={(e) => reset(setSort)(e.target.value as ScriptSort)}
+          >
+            {SCRIPT_SORTS.map((value) => (
+              <option key={value} value={value}>
+                {t(`miniApps.sort.${value}`)}
+              </option>
+            ))}
+          </select>
+          <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => scripts.reload()}>
             {t('common.refresh')}
           </button>
         </div>
-        {scripts.loading ? (
+        {scripts.loading && !scripts.data ? (
           <>
             <div className="skel" />
             <div className="skel" />
@@ -304,7 +398,7 @@ export default function MiniAppsPage() {
         ) : !rows.length ? (
           <div className="empty">
             <div className="icon">📦</div>
-            <b>{t('miniApps.emptyTitle')}</b>
+            <b>{filter ? t('miniApps.emptyFilteredTitle') : t('miniApps.emptyTitle')}</b>
             <p>{t('miniApps.emptyBody')}</p>
             {approved && (
               <button className="btn pri sm" onClick={() => setShowUpload(true)}>

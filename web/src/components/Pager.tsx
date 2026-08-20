@@ -15,14 +15,14 @@ export function Pager({
   onChange: (skip: number) => void
 }) {
   const { t } = useI18n()
-  if (total <= limit) return null
+  const currentPage = Math.floor(skip / limit) + 1
+  // Every hook runs before the "one page, no pager" exit. Filtering a list down to a single
+  // page used to change the hook count between renders, which React answers with a crash.
+  const [draft, setDraft] = useState(String(currentPage))
 
   const from = skip + 1
   const to = Math.min(skip + limit, total)
-  const currentPage = Math.floor(skip / limit) + 1
   const totalPages = Math.ceil(total / limit)
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [draft, setDraft] = useState(String(currentPage))
 
   const jump = () => {
     const n = parseInt(draft, 10)
@@ -44,6 +44,8 @@ export function Pager({
   ) {
     setDraft(String(currentPage))
   }
+
+  if (total <= limit) return null
 
   return (
     <div className="pager">

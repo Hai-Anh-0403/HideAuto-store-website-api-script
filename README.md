@@ -21,7 +21,8 @@ docker compose up -d --build
 ```
 
 - Web: <http://localhost:3000>
-- API + Swagger: <http://localhost:3001/docs> (dùng để thao tác **admin**: duyệt seller, duyệt version)
+- Trang duyệt (admin): <http://localhost:3000/admin> — duyệt seller, duyệt version
+- API + Swagger: <http://localhost:3001/docs>
 
 Server tự `prisma db push` + seed lúc khởi động, nên DB trống vẫn dùng được ngay:
 6 tag mặc định và một admin **`admin@local.test` / `admin12345`**.
@@ -61,18 +62,60 @@ Chạy riêng: `pnpm dev:server` hoặc `pnpm dev:web`.
 
 ---
 
+## Dữ liệu demo (tuỳ chọn)
+
+`pnpm db:seed` chỉ tạo tag + **admin**, mà form đăng nhập của web là của **seller** — nên tài
+khoản admin không vào được portal, và portal mới dựng thì trống trơn. Muốn có sẵn dữ liệu để
+bấm thử:
+
+```bash
+pnpm db:seed:demo
+```
+
+Tạo một seller đã duyệt (`APPROVED`) kèm 3 mini app, 4 version, 4 khoá và 3 thành viên:
+
+| | |
+|---|---|
+| Portal | <http://localhost:3000> |
+| Email | `seller@local.test` |
+| Mật khẩu | `seller12345` |
+
+Đổi bằng `DEMO_EMAIL` / `DEMO_PASSWORD`. Chạy lại được nhiều lần (upsert theo email/slug/khoá),
+và **luôn reset mật khẩu** seller demo để thông tin ở trên lúc nào cũng đúng.
+
+Graph đi qua đúng pipeline thật (`extractPackage` → `scrubCredentials` → `deriveMetadata`), nên
+các cột metadata giống hệt một lần publish thật. Riêng *Gmail Warmup Bot* cố tình nhúng API key
+và mật khẩu SMTP: store xoá trắng khi lưu, và version đó **bị chặn duyệt** (409) — đúng luồng
+thật ở bước 5 bên dưới.
+
+Dọn sạch khi không cần nữa:
+
+```bash
+pnpm db:seed:demo:clear
+```
+
+Xoá seller demo cùng toàn bộ script / version / khoá / thành viên / thiết bị / bản build và các
+file graph đã lưu. Tag và admin giữ nguyên (đó là của `db:seed`), và tài khoản bạn tự tạo tay
+trong portal cũng không bị đụng — lệnh này chỉ nhắm đúng `DEMO_EMAIL`.
+
+> ⚠️ Chỉ dùng khi dev. Toàn bộ là dữ liệu giả và mật khẩu nằm sẵn trong repo.
+
+---
+
 ## Thử một vòng đầy đủ
 
-1. **Web** → tab *Đăng ký* → tạo seller (trạng thái `PENDING`).
-2. **Swagger** → `POST /api/v1/auth/admin/login` (`admin@local.test` / `admin12345`) → lấy token →
-   `Authorize` → `GET /api/v1/admin/sellers` → `PATCH /api/v1/admin/sellers/{id}/approve`.
+1. **Web** → tab *Đăng ký* → tạo seller (trạng thái `PENDING`). Chưa duyệt thì không đăng app
+   hay phát khoá được — API trả `seller_not_approved`.
+2. **Trang duyệt** <http://localhost:3000/admin> → đăng nhập `admin@local.test` / `admin12345`
+   → tab *Cửa hàng* → **Duyệt** (từ chối thì nhập lý do, seller sẽ đọc được).
 3. **Web** → đăng nhập seller → *Mini app của tôi* → **Tải mini app lên**
    (gói `.zip`/`.exe` của mini app, hoặc file `app.workflow` / graph `.json`).
    Store tự tách graph, **xoá credential**, và suy ra node/khả năng/biến từ graph.
 4. **Web** → *Gửi duyệt*.
-5. **Swagger** → `PATCH /api/v1/admin/scripts/versions/{vid}/approve`.
-   Còn credential trong graph ⇒ trả **409**, seller phải xoá và tải lại.
-6. **Web** → tab *Khóa* → tạo khóa (mở đúng mini app đó).
+5. **Trang duyệt** → tab *Chờ duyệt* → xem scan (số secret, node dùng shell) → **Duyệt và cho bán**.
+   Còn credential trong graph ⇒ nút bị chặn, API trả **409**; seller phải xoá và tải lại.
+6. **Web** → *Khoá kích hoạt* → **Tạo khoá**: chọn 1 mini app hoặc *cả shop*, đặt số lượng,
+   giới hạn lượt và hạn dùng → copy khoá (hoặc tải CSV) gửi người mua.
 
 ---
 

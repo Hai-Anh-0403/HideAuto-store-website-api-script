@@ -34,12 +34,23 @@ export class AppDownloadService {
   ): Promise<Download> {
     const { script } = await this.activation.authorize(buyer, scriptId);
 
-    // Only an approved version is downloadable: a pending one has not been reviewed and
-    // may still carry whatever the seller uploaded.
-    const version = await this.prisma.scriptVersion.findFirst({
-      where: { scriptId, status: 'APPROVED' },
-      orderBy: { createdAt: 'desc' },
-    });
+    // The version the listing currently sells — which is `latestVersionId`, not simply the
+    // newest approved row: rolling back to an older version has to change what buyers get,
+    // and the licence the app checks is signed against this same pointer.
+    //
+    // Only an approved version is ever downloadable; a pending one has not been reviewed
+    // and may still carry whatever the seller uploaded. The newest approved row is the
+    // fallback for a listing whose pointer was never set.
+    const version =
+      (script.latestVersionId
+        ? await this.prisma.scriptVersion.findFirst({
+            where: { id: script.latestVersionId, status: 'APPROVED' },
+          })
+        : null) ??
+      (await this.prisma.scriptVersion.findFirst({
+        where: { scriptId, status: 'APPROVED' },
+        orderBy: { createdAt: 'desc' },
+      }));
     if (!version) {
       throw new NotFoundError(
         'no_approved_version',

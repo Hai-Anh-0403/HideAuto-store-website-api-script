@@ -19,6 +19,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard';
 import { AppAuthGuard } from './app-auth.guard';
 import { CurrentBuyer } from './current-buyer.decorator';
 import type { BuyerIdentity } from './flowdesk.service';
@@ -29,7 +30,7 @@ import { RedeemKeyDto } from './dto/redeem-key.dto';
 
 @ApiTags('App (end user)')
 @ApiBearerAuth()
-@UseGuards(AppAuthGuard)
+@UseGuards(AppAuthGuard, RateLimitGuard)
 @Controller('api/v1/app')
 export class AppClientController {
   constructor(
@@ -47,6 +48,15 @@ export class AppClientController {
 
   @Post('keys/redeem')
   @HttpCode(HttpStatus.CREATED)
+  // A wrong key is indistinguishable from a wrong guess: throttle so the key space cannot
+  // be walked. Keyed on the code being tried as well as the caller, because buyers behind
+  // one corporate address must not throttle each other.
+  @RateLimit({
+    limit: 10,
+    windowMs: 60_000,
+    subjectField: 'key',
+    clientLimit: 60,
+  })
   @ApiOperation({ summary: 'Redeem a key to unlock a mini app' })
   async redeem(
     @CurrentBuyer() buyer: BuyerIdentity,
@@ -63,6 +73,7 @@ export class AppClientController {
 
   @Post('scripts/:scriptId/license')
   @HttpCode(HttpStatus.OK)
+  @RateLimit({ limit: 60, windowMs: 60_000 })
   @ApiOperation({
     summary: 'Activate a packaged mini app on this machine and get a signed licence',
   })

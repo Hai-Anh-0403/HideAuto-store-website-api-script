@@ -5,12 +5,13 @@ import {
   NotFoundError,
 } from '../common/errors';
 import slugify from 'slugify';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateScriptDto } from './dto/create-script.dto';
 import { UpdateScriptDto } from './dto/update-script.dto';
 import { CreateVersionDto } from './dto/create-version.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { ListScriptsDto } from './dto/list-scripts.dto';
 import { PageDto } from '../common/dto/page.dto';
 import { extractPackage } from '../common/graph/package-extract';
 import {
@@ -104,22 +105,58 @@ export class ScriptsService {
     };
   }
 
-  async list(sellerId: string, pagination: PaginationDto) {
+  /**
+   * The seller's own catalogue.
+   *
+   * `sellerId` is part of the filter, never of the query string — a seller must not be able
+   * to widen this list past their own scripts. Search stays case-insensitive on the three
+   * fields a seller actually recognises an app by (name, slug, the one-line description).
+   */
+  async list(sellerId: string, dto: ListScriptsDto) {
+    const where: Prisma.ScriptWhereInput = { sellerId };
+    if (dto.status) where.status = dto.status;
+    if (dto.search) {
+      where.OR = [
+        { name: { contains: dto.search, mode: 'insensitive' } },
+        { slug: { contains: dto.search, mode: 'insensitive' } },
+        { shortDescription: { contains: dto.search, mode: 'insensitive' } },
+      ];
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.script.findMany({
-        where: { sellerId },
-        orderBy: { createdAt: 'desc' },
-        skip: pagination.skip,
-        take: pagination.limit,
+        where,
+        orderBy: this.scriptOrderBy(dto.sort),
+        skip: dto.skip,
+        take: dto.limit,
         include: {
           tags: { select: { id: true, name: true, slug: true, color: true } },
           _count: { select: { versions: true, keys: true } },
         },
       }),
-      this.prisma.script.count({ where: { sellerId } }),
+      this.prisma.script.count({ where }),
     ]);
 
-    return new PageDto(items, total, pagination.skip, pagination.limit);
+    return new PageDto(items, total, dto.skip, dto.limit);
+  }
+
+  /**
+   * Sort keys are an allow-list, not a column name off the wire.
+   *
+   * Every option falls back to `createdAt desc` so paging stays stable when the primary key
+   * ties (two apps with zero downloads must not swap places between page 1 and page 2).
+   */
+  private scriptOrderBy(
+    sort: ListScriptsDto['sort'],
+  ): Prisma.ScriptOrderByWithRelationInput[] {
+    switch (sort) {
+      case 'name':
+        return [{ name: 'asc' }, { createdAt: 'desc' }];
+      case 'downloads':
+        return [{ downloads: 'desc' }, { createdAt: 'desc' }];
+      default:
+        return [{ createdAt: 'desc' }];
+    }
   }
 
   async create(
@@ -148,6 +185,8 @@ export class ScriptsService {
         name: dto.name,
         slug,
         shortDescription: dto.shortDescription,
+        description: dto.description,
+        minAppVersion: dto.minAppVersion,
         sellerId,
         sellerName: seller.name,
         status: 'DRAFT',
@@ -165,11 +204,14 @@ export class ScriptsService {
       },
     });
 
-    // Create initial version
+    // The first version. The seller names it — a shop porting an app that is already at
+    // 2.3.0 elsewhere should not have to call it 1.0.0 and then immediately re-upload.
     const version = await this.prisma.scriptVersion.create({
       data: {
         scriptId: script.id,
-        version: '1.0.0',
+        version: dto.version ?? '1.0.0',
+        changelog: dto.changelog,
+        minAppVersion: dto.minAppVersion,
         status: 'PENDING_REVIEW',
         ...this.versionData(ingested),
       },
@@ -194,15 +236,35 @@ export class ScriptsService {
         tags: { select: { id: true, name: true, slug: true, color: true } },
         versions: {
           orderBy: { createdAt: 'desc' },
+          // The detail page renders the derived metadata and the scan, so a version has
+          // to come back whole. Storage refs (fileUrl / sourceChecksum) stay internal;
+          // `scan.credential_paths` is safe to ship — paths only, never values.
           select: {
             id: true,
+            scriptId: true,
             version: true,
             changelog: true,
-            status: true,
+            sourceFilename: true,
+            delivery: true,
+            formatVersion: true,
+            minAppVersion: true,
+            testedAppVersion: true,
+            graphExtracted: true,
             nodeCount: true,
-            createdAt: true,
-            releasedAt: true,
+            nodeGroupsUsed: true,
+            usesControlFlow: true,
+            subWorkflowIds: true,
+            capabilities: true,
+            requiredVars: true,
+            scan: true,
+            appId: true,
+            appName: true,
+            status: true,
             reviewNote: true,
+            reviewedAt: true,
+            scannedAt: true,
+            releasedAt: true,
+            createdAt: true,
           },
         },
       },
@@ -318,27 +380,184 @@ export class ScriptsService {
         scriptId,
         version: dto.version,
         changelog: dto.changelog,
+        minAppVersion: dto.minAppVersion,
         status: 'PENDING_REVIEW',
         ...this.versionData(ingested),
       },
     });
 
-    // Listing-level metadata always mirrors the newest version's graph.
+    // `latestVersion*` is the **live** version — what the store lists, what a licence is
+    // signed against, what a buyer downloads. A fresh upload is not that until an admin
+    // approves it, so the pointer only moves here while nothing has ever been approved
+    // (a draft still finding its shape). `AdminService.approveVersion` moves it after that.
+    const approvedCount = await this.prisma.scriptVersion.count({
+      where: { scriptId, status: 'APPROVED' },
+    });
+
+    if (approvedCount === 0) {
+      await this.prisma.script.update({
+        where: { id: scriptId },
+        data: {
+          latestVersion: version.version,
+          latestVersionId: version.id,
+          ...(dto.minAppVersion ? { minAppVersion: dto.minAppVersion } : {}),
+          ...(ingested && {
+            hasMiniApp: ingested.delivery === 'mini_app_exe',
+            nodeCount: ingested.metadata.node_count,
+            nodeGroupsUsed: ingested.metadata.node_groups_used,
+            capabilities: ingested.metadata.capabilities as unknown as object,
+          }),
+        },
+      });
+    }
+
+    return version;
+  }
+
+  /**
+   * Resolve a version through its script's owner.
+   *
+   * Version ids are globally unique, so a version-scoped route that looked one up directly
+   * would happily act on another seller's row. Ownership is proved on the *script* first,
+   * then the version is only ever fetched scoped to that script.
+   */
+  private async ownedVersion(
+    sellerId: string,
+    scriptId: string,
+    versionId: string,
+  ) {
+    const script = await this.prisma.script.findFirst({
+      where: { id: scriptId, sellerId },
+    });
+
+    if (!script) {
+      throw new NotFoundException('Script not found');
+    }
+
+    const version = await this.prisma.scriptVersion.findFirst({
+      where: { id: versionId, scriptId },
+    });
+
+    if (!version) {
+      throw new NotFoundError(
+        'version_not_found',
+        'Version not found for this script',
+      );
+    }
+
+    return { script, version };
+  }
+
+  /**
+   * Drop a version the seller uploaded by mistake.
+   *
+   * Deleting is only ever safe while nothing downstream depends on the row. An APPROVED
+   * version has been on the store — a buyer may hold a licence signed against it — so it
+   * stays forever; only something still waiting for review, or already turned down, can go.
+   * The live pointer and any packaged build are the other two things that would be left
+   * dangling, and each refuses with its own code so the portal can say which one it is.
+   */
+  async deleteVersion(
+    sellerId: string,
+    scriptId: string,
+    versionId: string,
+  ): Promise<void> {
+    const { script, version } = await this.ownedVersion(
+      sellerId,
+      scriptId,
+      versionId,
+    );
+
+    if (version.status !== 'PENDING_REVIEW' && version.status !== 'REJECTED') {
+      throw new ConflictError(
+        'version_not_deletable',
+        'Only a pending or rejected version can be deleted — an approved one may ' +
+          'already have been sold and downloaded',
+      );
+    }
+
+    if (script.latestVersionId === version.id) {
+      throw new ConflictError(
+        'version_is_live',
+        'This is the version the listing currently points at — make another version ' +
+          'live first',
+      );
+    }
+
+    const remaining = await this.prisma.scriptVersion.count({
+      where: { scriptId },
+    });
+    if (remaining <= 1) {
+      throw new ConflictError(
+        'version_last_remaining',
+        'A script must keep at least one version — delete the script instead',
+      );
+    }
+
+    const builds = await this.prisma.miniAppBuild.count({
+      where: { scriptVersionId: versionId },
+    });
+    if (builds > 0) {
+      throw new ConflictError(
+        'version_has_builds',
+        `${builds} mini-app build(s) were packaged from this version; it cannot be ` +
+          'deleted',
+      );
+    }
+
+    await this.prisma.scriptVersion.delete({ where: { id: versionId } });
+  }
+
+  /**
+   * Point the listing back at an older approved version.
+   *
+   * When a fresh release turns out to be broken the seller's only recourse used to be
+   * uploading the old graph again and waiting for another review, leaving buyers on the bad
+   * build in the meantime. Rollback reuses a version review has already cleared, so it needs
+   * no new approval — which is also why only an APPROVED version qualifies.
+   *
+   * The listing columns are copied from the version exactly as `AdminService.approveVersion`
+   * copies them; the script's own `status` is deliberately left alone, so rolling back never
+   * relists an app the seller took off the store.
+   */
+  async rollbackVersion(
+    sellerId: string,
+    scriptId: string,
+    versionId: string,
+  ) {
+    const { script, version } = await this.ownedVersion(
+      sellerId,
+      scriptId,
+      versionId,
+    );
+
+    if (version.status !== 'APPROVED') {
+      throw new ConflictError(
+        'version_not_approved',
+        'Only an approved version can be made live',
+      );
+    }
+
+    if (script.latestVersionId === version.id) {
+      throw new ConflictError(
+        'version_already_live',
+        `Version ${version.version} is already the live one`,
+      );
+    }
+
     await this.prisma.script.update({
       where: { id: scriptId },
       data: {
         latestVersion: version.version,
         latestVersionId: version.id,
-        ...(ingested && {
-          hasMiniApp: ingested.delivery === 'mini_app_exe',
-          nodeCount: ingested.metadata.node_count,
-          nodeGroupsUsed: ingested.metadata.node_groups_used,
-          capabilities: ingested.metadata.capabilities as unknown as object,
-        }),
+        minAppVersion: version.minAppVersion,
+        nodeCount: version.nodeCount,
+        nodeGroupsUsed: version.nodeGroupsUsed,
+        capabilities: version.capabilities ?? {},
       },
     });
 
-    return version;
+    return this.findOne(sellerId, scriptId);
   }
 
   async submit(sellerId: string, scriptId: string) {

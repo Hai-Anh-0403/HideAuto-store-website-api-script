@@ -1,4 +1,12 @@
-import type { BuildStatus, KeyStatus, MemberStatus, ScriptStatus, SellerStatus, VersionStatus } from '@/types'
+import type {
+  BuildStatus,
+  KeyState,
+  KeyStatus,
+  MemberStatus,
+  ScriptStatus,
+  SellerStatus,
+  VersionStatus,
+} from '@/types'
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'neutral' | 'accent'
 
@@ -30,6 +38,14 @@ export const buildStatus: Record<BuildStatus, Badge> = {
 export const keyStatus: Record<KeyStatus, Badge> = {
   ACTIVE: { tone: 'ok', key: 'status.key.active' },
   REVOKED: { tone: 'neutral', key: 'status.key.revoked' },
+}
+
+/** What the API derived: a key can be ACTIVE in the database yet unusable. */
+export const keyState: Record<KeyState, Badge> = {
+  ACTIVE: { tone: 'ok', key: 'status.key.active' },
+  REVOKED: { tone: 'neutral', key: 'status.key.revoked' },
+  EXPIRED: { tone: 'warn', key: 'status.key.expired' },
+  EXHAUSTED: { tone: 'warn', key: 'status.key.exhausted' },
 }
 
 export const sellerStatus: Record<SellerStatus, Badge> = {

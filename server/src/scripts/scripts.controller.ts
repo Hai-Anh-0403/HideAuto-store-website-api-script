@@ -20,6 +20,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SellerAuthGuard } from '../auth/seller-auth.guard';
+import { ApprovedSellerGuard } from '../auth/approved-seller.guard';
 import {
   CurrentUser,
   RequestUser,
@@ -28,7 +29,7 @@ import { ScriptsService } from './scripts.service';
 import { CreateScriptDto } from './dto/create-script.dto';
 import { UpdateScriptDto } from './dto/update-script.dto';
 import { CreateVersionDto } from './dto/create-version.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { ListScriptsDto } from './dto/list-scripts.dto';
 
 /**
  * Uploads are untrusted: cap the request before multer buffers it into memory.
@@ -38,18 +39,17 @@ const UPLOAD_LIMITS = { limits: { fileSize: 128 * 1024 * 1024, files: 1 } };
 
 @ApiTags('Scripts')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SellerAuthGuard)
+@UseGuards(JwtAuthGuard, SellerAuthGuard, ApprovedSellerGuard)
 @Controller('api/v1/scripts')
 export class ScriptsController {
   constructor(private readonly scriptsService: ScriptsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List seller scripts (paginated)' })
-  async list(
-    @CurrentUser() user: RequestUser,
-    @Query() pagination: PaginationDto,
-  ) {
-    return this.scriptsService.list(user.id, pagination);
+  @ApiOperation({
+    summary: 'List seller scripts (paginated, searchable, filterable)',
+  })
+  async list(@CurrentUser() user: RequestUser, @Query() query: ListScriptsDto) {
+    return this.scriptsService.list(user.id, query);
   }
 
   @Post()
@@ -133,6 +133,30 @@ export class ScriptsController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.scriptsService.createVersion(user.id, id, dto, file);
+  }
+
+  @Delete(':id/versions/:versionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Delete a pending or rejected version (mis-upload cleanup)',
+  })
+  async deleteVersion(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+  ) {
+    await this.scriptsService.deleteVersion(user.id, id, versionId);
+  }
+
+  @Post(':id/versions/:versionId/rollback')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Make an older approved version live again' })
+  async rollbackVersion(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.scriptsService.rollbackVersion(user.id, id, versionId);
   }
 
   @Post(':id/submit')

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { BrandLogo } from '@/components/Brand'
+import { ConfirmProvider } from '@/components/Confirm'
 import { ToastProvider } from '@/components/Toast'
 import { useI18n } from '@/i18n'
 import { AuthProvider, useAuth } from '@/lib/auth'
@@ -120,7 +121,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   return (
     <AuthProvider>
       <ToastProvider>
-        <PortalShell>{children}</PortalShell>
+        <ConfirmProvider>
+          <PortalShell>{children}</PortalShell>
+        </ConfirmProvider>
       </ToastProvider>
     </AuthProvider>
   )

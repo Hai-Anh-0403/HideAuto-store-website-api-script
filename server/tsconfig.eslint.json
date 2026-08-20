@@ -1,0 +1,5 @@
+{
+  "//": "Lint-only project: the build compiles src/ alone, but eslint also parses test/ and needs those files to belong to a project.",
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*", "test/**/*"]
+}
