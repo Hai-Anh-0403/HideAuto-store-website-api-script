@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useRef, useState, type FormEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Pager } from '@/components/Pager'
 import { Pill } from '@/components/Pill'
@@ -23,6 +23,8 @@ import {
 import { useFetch } from '@/lib/useFetch'
 import { useTitle } from '@/lib/useTitle'
 import { CapsChips, GroupChips } from '@/components/Chips'
+import { RichTextEditor } from '@/components/RichTextEditor'
+import { VideoInput } from '@/components/VideoInput'
 import type {
   KeyCreate,
   KeyItem,
@@ -31,6 +33,26 @@ import type {
   ScriptDetail,
   ScriptVersion,
 } from '@/types'
+
+const MAX_THUMBNAIL_SIZE = 1 * 1024 * 1024
+const MAX_IMAGE_SIZE = 3 * 1024 * 1024
+
+async function uploadMedia(
+  file: File,
+  type: 'thumbnail' | 'image',
+): Promise<string | null> {
+  const limit = type === 'thumbnail' ? MAX_THUMBNAIL_SIZE : MAX_IMAGE_SIZE
+  if (file.size > limit || !file.type.startsWith('image/')) return null
+  const form = new FormData()
+  form.append('file', file)
+  form.append('type', type)
+  try {
+    const result = await api.upload<{ url: string }>('/media', form)
+    return result.url
+  } catch {
+    return null
+  }
+}
 
 type Tab = 'ov' | 'ver' | 'keys' | 'mini'
 
@@ -297,12 +319,6 @@ export default function MiniAppDetailPage() {
               return t('packaging.downloading')
             })
           }
-          onDownloadGraph={() =>
-            run(async () => {
-              await api.download(`/scripts/${s.id}/download`, `${s.slug}.json`)
-              return t('packaging.downloading')
-            })
-          }
         />
       )}
     </>
@@ -367,9 +383,15 @@ function EditListing({ s, onSaved }: { s: ScriptDetail; onSaved: () => void }) {
   const { t } = useI18n()
   const { toast } = useToast()
   const errorText = useErrorText()
+  const thumbRef = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
+
   const [name, setName] = useState(s.name)
   const [short, setShort] = useState(s.shortDescription ?? '')
   const [description, setDescription] = useState(s.description ?? '')
+  const [videoUrl, setVideoUrl] = useState(s.videoUrl ?? '')
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(s.thumbnailUrl ?? null)
+  const [images, setImages] = useState<string[]>(s.images ?? [])
   const [tagIds, setTagIds] = useState<string[]>(s.tags.map((tg) => tg.id))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
@@ -378,6 +400,9 @@ function EditListing({ s, onSaved }: { s: ScriptDetail; onSaved: () => void }) {
     name !== s.name ||
     short !== (s.shortDescription ?? '') ||
     description !== (s.description ?? '') ||
+    videoUrl !== (s.videoUrl ?? '') ||
+    thumbnailUrl !== (s.thumbnailUrl ?? null) ||
+    JSON.stringify(images) !== JSON.stringify(s.images ?? []) ||
     JSON.stringify(tagIds) !== JSON.stringify(s.tags.map((tg) => tg.id))
 
   const save = async (e: FormEvent) => {
@@ -389,6 +414,9 @@ function EditListing({ s, onSaved }: { s: ScriptDetail; onSaved: () => void }) {
         name,
         shortDescription: short || null,
         description: description || null,
+        videoUrl: videoUrl || null,
+        thumbnailUrl: thumbnailUrl || null,
+        images,
         tagIds,
       })
       toast(t('detail.edit.saved'))
@@ -400,34 +428,124 @@ function EditListing({ s, onSaved }: { s: ScriptDetail; onSaved: () => void }) {
     }
   }
 
+  const pickThumb = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > MAX_THUMBNAIL_SIZE) {
+      toast(t('newUpload.thumbnailTooBig', { max: '1 MB' }))
+      e.target.value = ''
+      return
+    }
+    const url = await uploadMedia(file, 'thumbnail')
+    if (url) setThumbnailUrl(url)
+    else toast(t('newUpload.uploadFailed'))
+    e.target.value = ''
+  }, [toast, t])
+
+  const pickGallery = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files?.length) return
+    const newUrls: string[] = []
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_IMAGE_SIZE) {
+        toast(t('newUpload.imageTooBig', { name: file.name, max: '3 MB' }))
+        continue
+      }
+      const url = await uploadMedia(file, 'image')
+      if (url) newUrls.push(url)
+    }
+    if (newUrls.length) setImages((prev) => [...prev, ...newUrls])
+    e.target.value = ''
+  }, [toast, t])
+
   return (
-    <div className="card">
-      <div className="card-h"><h3>{t('detail.edit.title')}</h3></div>
-      <form onSubmit={save} style={{ padding: 16 }}>
-        {error != null && <div className="state bad">{errorText(error)}</div>}
-        <div className="grid2">
-          <label className="field">
-            <span>{t('detail.edit.name')}</span>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} minLength={3} maxLength={120} required />
-          </label>
-          <label className="field">
-            <span>{t('detail.edit.shortDescription')}</span>
-            <input className="input" value={short} onChange={(e) => setShort(e.target.value)} maxLength={200} placeholder={t('detail.edit.shortPlaceholder')} />
-          </label>
-        </div>
-        <label className="field">
-          <span>{t('detail.edit.description')}</span>
-          <textarea className="input" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={20000} placeholder={t('detail.edit.descriptionPlaceholder')} />
-        </label>
-        <TagPicker value={tagIds} onChange={setTagIds} />
-        <div className="formrow">
-          <button className="btn pri sm" type="submit" disabled={busy || !dirty}>
-            {busy ? t('detail.edit.saving') : t('detail.edit.save')}
-          </button>
-          <span className="note">{t('detail.edit.slugNote', { slug: s.slug })}</span>
-        </div>
-      </form>
-    </div>
+    <>
+      {/* Basic info */}
+      <div className="card">
+        <div className="card-h"><h3>{t('detail.edit.title')}</h3></div>
+        <form onSubmit={save} style={{ padding: 16 }}>
+          {error != null && <div className="state bad">{errorText(error)}</div>}
+          <div className="grid2">
+            <label className="field">
+              <span>{t('detail.edit.name')}</span>
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} minLength={3} maxLength={120} required />
+            </label>
+            <label className="field">
+              <span>{t('detail.edit.shortDescription')}</span>
+              <input className="input" value={short} onChange={(e) => setShort(e.target.value)} maxLength={300} placeholder={t('detail.edit.shortPlaceholder')} />
+            </label>
+          </div>
+
+          {/* Video URL */}
+          <div className="field">
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 5 }}>
+              {t('newUpload.videoTitle')}
+            </span>
+            <VideoInput value={videoUrl} onChange={setVideoUrl} />
+          </div>
+
+          {/* Thumbnail */}
+          <div className="field">
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 5 }}>
+              {t('newUpload.thumbnailTitle')}
+            </span>
+            {thumbnailUrl ? (
+              <div className="img-preview" style={{ maxWidth: 240 }}>
+                <img src={thumbnailUrl} alt="Thumbnail" />
+                <button type="button" className="img-preview-rm" onClick={() => setThumbnailUrl(null)}>✕</button>
+              </div>
+            ) : (
+              <div className="img-upload-zone" onClick={() => thumbRef.current?.click()}>
+                {t('newUpload.pickThumbnail', { max: '1 MB' })}
+              </div>
+            )}
+            <input ref={thumbRef} type="file" accept="image/*" onChange={pickThumb} style={{ display: 'none' }} />
+          </div>
+
+          {/* Gallery */}
+          <div className="field">
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 5 }}>
+              {t('newUpload.galleryTitle')}
+            </span>
+            {images.length > 0 && (
+              <div className="gallery-grid" style={{ marginBottom: 8 }}>
+                {images.map((u, i) => (
+                  <div key={u} className="img-preview">
+                    <img src={u} alt={`Image ${i + 1}`} />
+                    <button type="button" className="img-preview-rm" onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="img-upload-zone" onClick={() => galleryRef.current?.click()}>
+              {t('newUpload.pickImages', { max: '3 MB' })}
+            </div>
+            <input ref={galleryRef} type="file" accept="image/*" multiple onChange={pickGallery} style={{ display: 'none' }} />
+          </div>
+
+          {/* Rich text description */}
+          <div className="field">
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 5 }}>
+              {t('detail.edit.description')}
+            </span>
+            <p className="note" style={{ marginBottom: 8 }}>{t('newUpload.descriptionHint')}</p>
+            <RichTextEditor
+              value={description}
+              onChange={setDescription}
+              placeholder={t('detail.edit.descriptionPlaceholder')}
+            />
+          </div>
+
+          <TagPicker value={tagIds} onChange={setTagIds} />
+          <div className="formrow">
+            <button className="btn pri sm" type="submit" disabled={busy || !dirty}>
+              {busy ? t('detail.edit.saving') : t('detail.edit.save')}
+            </button>
+            <span className="note">{t('detail.edit.slugNote', { slug: s.slug })}</span>
+          </div>
+        </form>
+      </div>
+    </>
   )
 }
 
@@ -550,11 +668,11 @@ function DetailVersions({
           <div className="grid2">
             <label className="field">
               <span>{t('upload.version')}</span>
-              <input className="input mono" value={version} onChange={(e) => setVersion(e.target.value)} pattern="\d+\.\d+\.\d+" required />
+              <input className="input mono" value={version} onChange={(e) => setVersion(e.target.value)} pattern="\d+\.\d+\.\d+" maxLength={20} required />
             </label>
             <label className="field">
               <span>{t('versions.changelog')}</span>
-              <input className="input" value={changelog} onChange={(e) => setChangelog(e.target.value)} />
+              <input className="input" value={changelog} onChange={(e) => setChangelog(e.target.value)} maxLength={2000} />
             </label>
           </div>
           <div className="grid2">
@@ -566,6 +684,7 @@ function DetailVersions({
                 onChange={(e) => setMinApp(e.target.value)}
                 placeholder={t('upload.minAppPlaceholder')}
                 pattern="\d+\.\d+\.\d+"
+                maxLength={20}
               />
             </label>
           </div>
@@ -839,7 +958,6 @@ function DetailPackaging({
   error,
   onBuild,
   onDownload,
-  onDownloadGraph,
 }: {
   builds: MiniAppBuild[]
   total: number
@@ -853,8 +971,6 @@ function DetailPackaging({
   onBuild: (versionId: string) => void
   /** The packaged .zip of one build — what a buyer would install. */
   onDownload: (build: MiniAppBuild) => void
-  /** The scrubbed graph, for importing back into the desktop app. */
-  onDownloadGraph: () => void
 }) {
   const { t } = useI18n()
   const [versionId, setVersionId] = useState(liveVersionId ?? versions[0]?.id ?? '')
@@ -864,7 +980,6 @@ function DetailPackaging({
       <div className="card-h">
         <h3>{t('packaging.title')}</h3>
         <div className="sp" />
-        <button className="btn sm" onClick={onDownloadGraph}>{t('packaging.downloadGraph')}</button>
         {versions.length > 0 && (
           <select
             className="input"

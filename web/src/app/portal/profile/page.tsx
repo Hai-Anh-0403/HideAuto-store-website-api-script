@@ -90,8 +90,8 @@ function StoreInfo({ seller, onSaved }: { seller: Seller; onSaved: () => void })
               className="input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              minLength={1}
-              maxLength={100}
+              minLength={2}
+              maxLength={120}
               required
             />
           </label>
@@ -101,7 +101,7 @@ function StoreInfo({ seller, onSaved }: { seller: Seller; onSaved: () => void })
               className="input"
               value={contact}
               onChange={(e) => setContact(e.target.value)}
-              maxLength={100}
+              maxLength={300}
               placeholder={t('profile.contactPlaceholder')}
             />
           </label>

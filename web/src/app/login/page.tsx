@@ -169,6 +169,7 @@ export default function LoginPage() {
                     }}
                     aria-invalid={fieldErrors.name != null}
                     placeholder={t('login.storeNamePlaceholder')}
+                    maxLength={120}
                   />
                   {fieldErrors.name && (
                     <span className="field-error">{t(fieldErrors.name)}</span>
@@ -187,6 +188,7 @@ export default function LoginPage() {
                   }}
                   aria-invalid={fieldErrors.email != null}
                   autoComplete="username"
+                  maxLength={254}
                 />
                 {fieldErrors.email && (
                   <span className="field-error">{t(fieldErrors.email)}</span>
@@ -204,6 +206,7 @@ export default function LoginPage() {
                   }}
                   aria-invalid={fieldErrors.password != null}
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  maxLength={128}
                 />
                 {fieldErrors.password && (
                   <span className="field-error">{t(fieldErrors.password)}</span>

@@ -87,6 +87,9 @@ export interface Script {
   name: string
   shortDescription: string | null
   description: string | null
+  videoUrl: string | null
+  thumbnailUrl: string | null
+  images: string[]
   sellerId: string
   sellerName: string
   engine: string

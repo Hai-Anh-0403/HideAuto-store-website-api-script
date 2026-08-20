@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateSellerDto {
@@ -6,10 +6,12 @@ export class UpdateSellerDto {
   @IsOptional()
   @IsString()
   @MinLength(2)
+  @MaxLength(120)
   name?: string;
 
   @ApiPropertyOptional({ example: 'new-contact@example.com' })
   @IsOptional()
   @IsString()
+  @MaxLength(300)
   contact?: string;
 }

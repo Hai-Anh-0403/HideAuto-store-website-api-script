@@ -100,7 +100,11 @@ model Script {
   slug             String       @unique
   name             String
   shortDescription String?      @map("short_description")
-  description      String?
+  description      String?      @db.Text
+  videoUrl         String?      @map("video_url")
+  thumbnailUrl     String?      @map("thumbnail_url")
+  /// JSON array of image URL strings.
+  images           Json         @default("[]")
   sellerId         String       @map("seller_id")
   seller           Seller       @relation(fields: [sellerId], references: [id])
   sellerName       String       @map("seller_name")

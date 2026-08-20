@@ -22,6 +22,7 @@ import {
   type GraphScan,
 } from '../common/graph/workflow-graph';
 import { toStringArray } from '../common/json-array';
+import { sanitizeDescription } from '../common/sanitize-html';
 
 /** Everything a version row derives from an upload — never trusted from the seller. */
 interface IngestedUpload {
@@ -186,7 +187,14 @@ export class ScriptsService {
         name: dto.name,
         slug,
         shortDescription: dto.shortDescription,
-        description: dto.description,
+        description: dto.description
+          ? sanitizeDescription(dto.description)
+          : undefined,
+        videoUrl: dto.videoUrl || undefined,
+        thumbnailUrl: dto.thumbnailUrl || undefined,
+        images: dto.images
+          ? JSON.stringify(dto.images.split(',').filter(Boolean))
+          : undefined,
         minAppVersion: dto.minAppVersion,
         sellerId,
         sellerName: seller.name,
@@ -299,7 +307,20 @@ export class ScriptsService {
         ...(dto.shortDescription !== undefined && {
           shortDescription: dto.shortDescription,
         }),
-        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.description !== undefined && {
+          description: dto.description
+            ? sanitizeDescription(dto.description)
+            : null,
+        }),
+        ...(dto.videoUrl !== undefined && {
+          videoUrl: dto.videoUrl || null,
+        }),
+        ...(dto.thumbnailUrl !== undefined && {
+          thumbnailUrl: dto.thumbnailUrl || null,
+        }),
+        ...(dto.images !== undefined && {
+          images: JSON.stringify(dto.images),
+        }),
         ...slugData,
         ...(dto.tagIds !== undefined && {
           tags: { set: dto.tagIds.map((id) => ({ id })) },
