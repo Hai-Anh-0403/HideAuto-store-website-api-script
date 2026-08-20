@@ -19,6 +19,7 @@ import { useDebounced } from '@/lib/useDebounced'
 import { useFetch } from '@/lib/useFetch'
 import type { AdminSeller, PendingScript, Page, SellerStatus, Token } from '@/types'
 import { useTitle } from '@/lib/useTitle'
+import { CapsChips, GroupChips } from '@/components/Chips'
 
 const PAGE_SIZE = 20
 
@@ -468,16 +469,8 @@ function ReviewQueue() {
               <div className="kv">
                 <span className="klab">{t('versions.nodes')}</span>
                 <b className="tnum">{version.nodeCount}</b>
-                <span className="chips" style={{ display: 'inline-flex' }}>
-                  {version.nodeGroupsUsed.map((g) => (
-                    <span key={g} className="groupchip" data-group={g}>
-                      {g}
-                    </span>
-                  ))}
-                </span>
-                {version.capabilities?.uses_shell && <Pill tone="bad">shell</Pill>}
-                {version.capabilities?.uses_ai_llm && <Pill tone="accent">AI</Pill>}
-                {version.capabilities?.requires_proxy && <Pill tone="neutral">proxy</Pill>}
+                <GroupChips groups={version.nodeGroupsUsed} inline />
+                <CapsChips caps={version.capabilities} />
               </div>
 
               <div className="kv">
@@ -490,8 +483,8 @@ function ReviewQueue() {
                   <span>
                     {t('versions.dirtyScan', { count: creds })}{' '}
                     {version.scan.credential_paths.map((p) => (
-                      <span key={p} className="keychip" style={{ marginRight: 4 }}>
-                        {p}
+                      <span key={p} className="keychip" style={{ marginRight: 8 }}>
+                        🔑 {p}
                       </span>
                     ))}
                   </span>

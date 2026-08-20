@@ -16,6 +16,7 @@ import { useDebounced } from '@/lib/useDebounced'
 import { useFetch } from '@/lib/useFetch'
 import type { Page, Script, ScriptInspect, ScriptStatus } from '@/types'
 import { useTitle } from '@/lib/useTitle'
+import { GroupChips } from '@/components/Chips'
 
 const PAGE_SIZE = 20
 
@@ -98,12 +99,8 @@ function InspectPreview({
       {(inspect.nodeGroupsUsed.length > 0 || inspect.usesShell) && (
         <div className="chips" style={{ marginTop: 8 }}>
           <span className="note">{t('preview.needs')}:</span>
-          {inspect.nodeGroupsUsed.map((g) => (
-            <span key={g} className="groupchip" data-group={g}>
-              {g}
-            </span>
-          ))}
-          {inspect.usesShell && <Pill tone="bad">⚠ shell</Pill>}
+          <GroupChips groups={inspect.nodeGroupsUsed} />
+          {inspect.usesShell && <Pill tone="bad">⚠ {t('cap.shell')}</Pill>}
         </div>
       )}
     </div>
@@ -435,11 +432,7 @@ export default function MiniAppsPage() {
                       </td>
                       <td>
                         <div className="chips">
-                          {s.nodeGroupsUsed.map((g) => (
-                            <span key={g} className="groupchip" data-group={g}>
-                              {g}
-                            </span>
-                          ))}
+                          <GroupChips groups={s.nodeGroupsUsed} />
                           {!s.nodeGroupsUsed.length && (
                             <span className="note">{t('common.dash')}</span>
                           )}

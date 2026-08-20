@@ -22,8 +22,8 @@ import {
 } from '@/lib/pills'
 import { useFetch } from '@/lib/useFetch'
 import { useTitle } from '@/lib/useTitle'
+import { CapsChips, GroupChips } from '@/components/Chips'
 import type {
-  Capabilities,
   KeyCreate,
   KeyItem,
   MiniAppBuild,
@@ -311,31 +311,6 @@ export default function MiniAppDetailPage() {
 
 /* ---------- Capabilities + Group chips ---------- */
 
-function CapsChips({ caps }: { caps: Capabilities }) {
-  return (
-    <div className="chips">
-      {caps.browser_platforms?.map((p) => (
-        <Pill key={p} tone="accent">{p}</Pill>
-      ))}
-      {caps.uses_shell && <Pill tone="bad">shell</Pill>}
-      {caps.requires_proxy && <Pill tone="neutral">proxy</Pill>}
-      {caps.uses_ai_llm && <Pill tone="accent">AI</Pill>}
-      {caps.uses_email && <Pill tone="neutral">email</Pill>}
-      {caps.uses_2fa && <Pill tone="warn">2FA</Pill>}
-    </div>
-  )
-}
-
-function GroupChips({ groups }: { groups: string[] }) {
-  return (
-    <span className="chips" style={{ display: 'inline-flex' }}>
-      {groups.map((g) => (
-        <span key={g} className="groupchip" data-group={g}>{g}</span>
-      ))}
-    </span>
-  )
-}
-
 /* ---------- Overview tab ---------- */
 
 function DetailOverview({
@@ -360,8 +335,16 @@ function DetailOverview({
             <GroupChips groups={s.nodeGroupsUsed} />
           </div>
           <div className="kv">
-            <span className="klab">{t('detail.caps.compat')}</span> {t('detail.caps.compatValue')}{' '}
-            <b>{s.minAppVersion ?? '—'}</b>
+            <span className="klab">{t('detail.caps.compat')}</span>{' '}
+            {/* No minimum means the sentence has no version to end on, so it changes
+                shape rather than trailing a dash the seller has to interpret. */}
+            {s.minAppVersion ? (
+              <>
+                {t('detail.caps.compatValue')} <b>{s.minAppVersion}</b>
+              </>
+            ) : (
+              <b>{t('detail.caps.anyVersion')}</b>
+            )}
           </div>
           <div className="kv">
             <span className="klab">{t('detail.caps.deps')}</span>{' '}
@@ -489,7 +472,7 @@ function Moderation({ s, latest, onSubmit }: { s: ScriptDetail; latest: ScriptVe
           <span className="note">
             {t('detail.moderation.credWarning', { count: creds })}{' '}
             {latest?.scan.credential_paths.map((p) => (
-              <span key={p} className="keychip" style={{ marginRight: 4 }}>{p}</span>
+              <span key={p} className="keychip" style={{ marginRight: 8 }}>🔑 {p}</span>
             ))}
           </span>
         </div>
@@ -513,7 +496,7 @@ function DetailVersions({
   onDelete: (version: ScriptVersion) => void
 }) {
   const { toast } = useToast()
-  const { t, lang } = useI18n()
+  const { t, tryT, lang } = useI18n()
   const errorText = useErrorText()
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [file, setFile] = useState<File | null>(null)
@@ -653,14 +636,15 @@ function DetailVersions({
                               <span>
                                 {t('versions.dirtyScan', { count: v.scan.embedded_credentials_count })}{' '}
                                 {v.scan.credential_paths.map((p) => (
-                                  <span key={p} className="keychip" style={{ marginRight: 4 }}>{p}</span>
+                                  <span key={p} className="keychip" style={{ marginRight: 8 }}>🔑 {p}</span>
                                 ))}
                               </span>
                             )}
                           </div>
                           <div className="kv">
                             <span className="klab">{t('versions.source')}</span>
-                            <span className="mono">{v.sourceFilename ?? '—'}</span> → {v.delivery}
+                            <span className="mono">{v.sourceFilename ?? '—'}</span> →{' '}
+                            {tryT(`delivery.${v.delivery}`, v.delivery)}
                           </div>
                           <div className="kv">
                             <span className="klab">{t('versions.caps')}</span>
