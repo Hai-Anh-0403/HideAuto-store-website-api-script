@@ -85,7 +85,6 @@ export const en: Record<keyof typeof vi, string> = {
   'login.working': 'Working...',
   'login.registered': 'Registered — waiting for admin approval.',
   'login.failed': 'Could not reach the server',
-  'login.adminLink': 'Store admin? Open the review console',
   'login.err.name': 'Enter your store name.',
   'login.err.email': 'Enter a valid email address.',
   'login.err.passwordRequired': 'Enter your password.',

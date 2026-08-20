@@ -222,11 +222,14 @@ export default function LoginPage() {
                     : t('login.signUp')}
               </button>
             </form>
-            <div className="note" style={{ marginTop: 12, textAlign: 'center' }}>
-              {/* The review console is a different identity system; sellers never need it,
-                  but an admin has to be able to find it without being told a URL. */}
-              <a href="/admin">{t('login.adminLink')}</a>
-            </div>
+            {/*
+             * No link to the review console from here, for now.
+             *
+             * It is a separate identity system that no seller can use, and this is the
+             * store's public front door — pointing at the admin entrance from it invites
+             * people to knock. `/admin` still answers on a direct URL, so nothing about
+             * the approval flow changes; an admin just has to know the address.
+             */}
           </div>
         </div>
       </div>

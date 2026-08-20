@@ -83,7 +83,6 @@ export const vi = {
   'login.working': 'Đang xử lý…',
   'login.registered': 'Đã đăng ký — chờ admin duyệt.',
   'login.failed': 'Không kết nối được máy chủ',
-  'login.adminLink': 'Là admin store? Mở trang duyệt',
   'login.err.name': 'Nhập tên cửa hàng.',
   'login.err.email': 'Nhập email hợp lệ.',
   'login.err.passwordRequired': 'Nhập mật khẩu.',
