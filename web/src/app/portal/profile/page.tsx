@@ -11,10 +11,12 @@ import { useErrorText } from '@/lib/errors'
 import { fmtWhen, sellerStatus } from '@/lib/pills'
 import { useFetch } from '@/lib/useFetch'
 import type { Seller, SellerSession } from '@/types'
+import { useTitle } from '@/lib/useTitle'
 
 export default function ProfilePage() {
   const { seller, refresh, logout } = useAuth()
   const { t } = useI18n()
+  useTitle(t('profile.title'))
   const [devicesKey, setDevicesKey] = useState(0)
 
   if (!seller) return null

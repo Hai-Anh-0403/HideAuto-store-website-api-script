@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n'
 import { api, setToken } from '@/lib/api'
 import { useErrorText } from '@/lib/errors'
 import type { Token } from '@/types'
+import { useTitle } from '@/lib/useTitle'
 
 type Mode = 'login' | 'register'
 type FieldErrors = { name?: string; email?: string; password?: string }
@@ -16,6 +17,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export default function LoginPage() {
   const router = useRouter()
   const { t, lang, setLang } = useI18n()
+  useTitle(t('login.signIn'))
   const errorText = useErrorText()
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')

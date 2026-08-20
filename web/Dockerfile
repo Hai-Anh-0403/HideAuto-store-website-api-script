@@ -10,6 +10,10 @@ FROM base AS build
 # setting it at runtime would have no effect.
 ARG API_ORIGIN=http://server:3001
 ENV API_ORIGIN=$API_ORIGIN
+# Same deal: `NEXT_PUBLIC_*` is inlined into the bundle at build time. It only feeds
+# `metadataBase`, so a wrong value costs absolute URLs in link previews, nothing more.
+ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 # Opt into `output: 'standalone'` — see the note in next.config.ts.
 ENV BUILD_STANDALONE=1
 

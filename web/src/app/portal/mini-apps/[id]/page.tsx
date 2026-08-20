@@ -21,6 +21,7 @@ import {
   versionStatus,
 } from '@/lib/pills'
 import { useFetch } from '@/lib/useFetch'
+import { useTitle } from '@/lib/useTitle'
 import type {
   Capabilities,
   KeyCreate,
@@ -59,6 +60,10 @@ export default function MiniAppDetailPage() {
     () => api.get<Page<MiniAppBuild>>(`/scripts/${id}/builds?skip=${buildSkip}&limit=${KEY_PAGE_SIZE}`),
     `builds:${id}:${buildSkip}`,
   )
+
+  // Above the early returns below: hooks cannot be conditional. Undefined while the
+  // fetch is in flight, which leaves the layout's own title in place.
+  useTitle(script.data?.name)
 
   const run = async (action: () => Promise<string>) => {
     try {

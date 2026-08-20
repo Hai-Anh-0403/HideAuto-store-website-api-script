@@ -72,6 +72,9 @@ services:
       # this has to be fixed at image build time.
       args:
         API_ORIGIN: http://server:3001
+        # Only feeds `metadataBase` (absolute OG/icon URLs). Override when the portal
+        # is served from a real domain.
+        NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost:3000}
     container_name: sah-web
     restart: unless-stopped
     depends_on:

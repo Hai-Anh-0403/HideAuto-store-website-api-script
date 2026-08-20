@@ -14,6 +14,7 @@ import { useErrorText } from '@/lib/errors'
 import { fmtWhen, keyState } from '@/lib/pills'
 import { useDebounced } from '@/lib/useDebounced'
 import { useFetch } from '@/lib/useFetch'
+import { useTitle } from '@/lib/useTitle'
 import type {
   KeyCreate,
   KeyItem,
@@ -33,6 +34,7 @@ const STATE_FILTERS: StateFilter[] = ['ALL', 'ACTIVE', 'EXPIRED', 'EXHAUSTED', '
 export default function KeysPage() {
   const { seller } = useAuth()
   const { t, lang } = useI18n()
+  useTitle(t('keys.title'))
   const errorText = useErrorText()
   const approved = seller?.status === 'APPROVED'
   const { toast } = useToast()

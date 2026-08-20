@@ -18,6 +18,7 @@ import { fmtWhen, scriptPill, sellerPill } from '@/lib/pills'
 import { useDebounced } from '@/lib/useDebounced'
 import { useFetch } from '@/lib/useFetch'
 import type { AdminSeller, PendingScript, Page, SellerStatus, Token } from '@/types'
+import { useTitle } from '@/lib/useTitle'
 
 const PAGE_SIZE = 20
 
@@ -30,6 +31,7 @@ const PAGE_SIZE = 20
  */
 export default function AdminPage() {
   const { t } = useI18n()
+  useTitle(t('admin.title'))
   const [token, setTok] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
   const [tab, setTab] = useState<'sellers' | 'review'>('sellers')

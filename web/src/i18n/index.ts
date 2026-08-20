@@ -8,13 +8,31 @@ const dicts = { en, vi } as const
 type Locale = keyof typeof dicts
 type Key = keyof typeof vi
 
-function getInitialLocale(): Locale {
-  if (typeof window === 'undefined') return 'vi'
-  return (localStorage.getItem('locale') as Locale) || 'vi'
-}
+const DEFAULT_LOCALE: Locale = 'vi'
 
-let currentLocale: Locale = getInitialLocale()
+/**
+ * Starts at the default on both sides of the wire.
+ *
+ * Reading localStorage here instead would make the module's value differ between the
+ * server render and the first client render, and React answers a mismatch by throwing
+ * the server HTML away and re-rendering the whole tree (hydration error #418). The
+ * stored choice is applied just after mount, which costs one extra render instead.
+ */
+let currentLocale: Locale = DEFAULT_LOCALE
+let storedLocaleApplied = false
 const listeners = new Set<() => void>()
+
+/** Adopt the visitor's saved locale. Safe to call from every mount; only the first acts. */
+function applyStoredLocale(): void {
+  if (storedLocaleApplied || typeof window === 'undefined') return
+  storedLocaleApplied = true
+
+  const stored = localStorage.getItem('locale')
+  if (stored && stored !== currentLocale && stored in dicts) {
+    currentLocale = stored as Locale
+    listeners.forEach((fn) => fn())
+  }
+}
 
 export type MessageKey = Key
 
@@ -24,6 +42,7 @@ export function useI18n() {
 
   useEffect(() => {
     listeners.add(forceUpdate)
+    applyStoredLocale()
     return () => {
       listeners.delete(forceUpdate)
     }

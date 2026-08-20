@@ -15,6 +15,7 @@ import { fmtCount, scriptPill, scriptStatus } from '@/lib/pills'
 import { useDebounced } from '@/lib/useDebounced'
 import { useFetch } from '@/lib/useFetch'
 import type { Page, Script, ScriptInspect, ScriptStatus } from '@/types'
+import { useTitle } from '@/lib/useTitle'
 
 const PAGE_SIZE = 20
 
@@ -286,6 +287,7 @@ function UploadForm({
 export default function MiniAppsPage() {
   const { seller } = useAuth()
   const { t, lang } = useI18n()
+  useTitle(t('miniApps.title'))
   const router = useRouter()
   const approved = seller?.status === 'APPROVED'
   const [skip, setSkip] = useState(0)

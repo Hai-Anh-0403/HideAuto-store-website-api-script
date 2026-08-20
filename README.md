@@ -69,8 +69,13 @@ khoản admin không vào được portal, và portal mới dựng thì trống 
 bấm thử:
 
 ```bash
-pnpm db:seed:demo
+pnpm db:seed:demo                      # khi chạy native (pnpm dev)
+docker exec sah-server node dist/seed-demo.js   # khi chạy bằng docker compose
 ```
+
+> Đang chạy bằng docker mà seed từ host thì graph đã scrub sẽ nằm ở `server/var/storage` trên
+> máy bạn, còn API trong container đọc `/data/storage` — nút tải graph sẽ 404. Seed bên trong
+> container thì cả DB lẫn file đều đúng chỗ.
 
 Tạo một seller đã duyệt (`APPROVED`) kèm 3 mini app, 4 version, 4 khoá và 3 thành viên:
 

@@ -13,6 +13,7 @@ import { fmtWhen, isOnline } from '@/lib/pills'
 import { useDebounced } from '@/lib/useDebounced'
 import { useFetch } from '@/lib/useFetch'
 import type { Member, MemberDevice, Page, Script } from '@/types'
+import { useTitle } from '@/lib/useTitle'
 
 const PAGE_SIZE = 20
 
@@ -22,6 +23,7 @@ const STATUS_FILTERS: StatusFilter[] = ['ALL', 'ACTIVE', 'BLOCKED', 'ONLINE']
 export default function MembersPage() {
   const { seller } = useAuth()
   const { t, lang } = useI18n()
+  useTitle(t('members.title'))
   const errorText = useErrorText()
   const approved = seller?.status === 'APPROVED'
   const { toast } = useToast()

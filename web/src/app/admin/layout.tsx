@@ -1,23 +1,22 @@
-'use client'
-
-import { ConfirmProvider } from '@/components/Confirm'
-import { ToastProvider } from '@/components/Toast'
+import type { Metadata } from 'next'
+import { AdminShell } from './AdminShell'
 
 /**
- * The admin console is deliberately outside `/portal`.
+ * Server wrapper around the client shell, so the admin console can declare metadata.
  *
- * It authenticates against a different identity system (an admin JWT, kept in its own
- * storage slot) and must not inherit the seller shell's `AuthProvider`, which would bounce
- * an admin to the seller login screen.
+ * `noindex` matters more here than anywhere else: this route lists pending sellers and
+ * the credential scan of every submitted version.
  */
+export const metadata: Metadata = {
+  title: 'Admin',
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: { index: false, follow: false },
+  },
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <ToastProvider>
-      <ConfirmProvider>
-        <div className="page-area" style={{ maxWidth: 1100, margin: '0 auto', padding: 24 }}>
-          {children}
-        </div>
-      </ConfirmProvider>
-    </ToastProvider>
-  )
+  return <AdminShell>{children}</AdminShell>
 }

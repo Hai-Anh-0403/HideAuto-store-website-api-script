@@ -8,10 +8,12 @@ import { useAuth } from '@/lib/auth'
 import { fmtWhen, isOnline } from '@/lib/pills'
 import { useFetch } from '@/lib/useFetch'
 import type { Member, Page, SellerStats } from '@/types'
+import { useTitle } from '@/lib/useTitle'
 
 export default function OverviewPage() {
   const { seller } = useAuth()
   const { t, lang } = useI18n()
+  useTitle(t('overview.title'))
   const approved = seller?.status === 'APPROVED'
   const key = `overview:${approved}`
 
