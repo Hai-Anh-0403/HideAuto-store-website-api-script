@@ -21,6 +21,7 @@ import {
   type GraphMetadata,
   type GraphScan,
 } from '../common/graph/workflow-graph';
+import { toStringArray } from '../common/json-array';
 
 /** Everything a version row derives from an upload — never trusted from the seller. */
 interface IngestedUpload {
@@ -117,9 +118,9 @@ export class ScriptsService {
     if (dto.status) where.status = dto.status;
     if (dto.search) {
       where.OR = [
-        { name: { contains: dto.search, mode: 'insensitive' } },
-        { slug: { contains: dto.search, mode: 'insensitive' } },
-        { shortDescription: { contains: dto.search, mode: 'insensitive' } },
+        { name: { contains: dto.search } },
+        { slug: { contains: dto.search } },
+        { shortDescription: { contains: dto.search } },
       ];
     }
 
@@ -552,7 +553,7 @@ export class ScriptsService {
         latestVersionId: version.id,
         minAppVersion: version.minAppVersion,
         nodeCount: version.nodeCount,
-        nodeGroupsUsed: version.nodeGroupsUsed,
+        nodeGroupsUsed: toStringArray(version.nodeGroupsUsed),
         capabilities: version.capabilities ?? {},
       },
     });

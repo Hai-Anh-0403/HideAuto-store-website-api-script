@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -111,8 +111,9 @@ model Script {
   latestVersionId String?  @map("latest_version_id")
   minAppVersion   String?  @map("min_app_version")
   nodeCount       Int      @default(0) @map("node_count")
-  nodeGroupsUsed  String[] @default([]) @map("node_groups_used")
-  capabilities    Json     @default("{}") @db.JsonB
+  /// JSON array of strings. MySQL has no scalar lists; read it through toStringArray().
+  nodeGroupsUsed  Json     @default("[]") @map("node_groups_used")
+  capabilities    Json     @default("{}")
 
   status       ScriptStatus @default(DRAFT)
   rejectReason String?      @map("reject_reason")
@@ -153,12 +154,14 @@ model ScriptVersion {
 
   graphExtracted  Boolean             @default(false) @map("graph_extracted")
   nodeCount       Int                 @default(0) @map("node_count")
-  nodeGroupsUsed  String[]            @default([]) @map("node_groups_used")
+  /// JSON array of strings — see the note on Script.nodeGroupsUsed.
+  nodeGroupsUsed  Json                @default("[]") @map("node_groups_used")
   usesControlFlow Boolean             @default(false) @map("uses_control_flow")
-  subWorkflowIds  String[]            @default([]) @map("sub_workflow_ids")
-  capabilities    Json                @default("{}") @db.JsonB
-  requiredVars    Json                @default("[]") @map("required_vars") @db.JsonB
-  scan            Json                @default("{}") @db.JsonB
+  /// JSON array of strings.
+  subWorkflowIds  Json                @default("[]") @map("sub_workflow_ids")
+  capabilities    Json                @default("{}")
+  requiredVars    Json                @default("[]") @map("required_vars")
+  scan            Json                @default("{}")
 
   appId   String? @map("app_id")
   appName String? @map("app_name")
@@ -245,10 +248,12 @@ model SellerMember {
   status         MemberStatus @default(ACTIVE)
   allScripts     Boolean      @default(false) @map("all_scripts")
   lastSeenAt     DateTime?    @map("last_seen_at")
-  blockedDevices String[]     @default([]) @map("blocked_devices")
+  /// JSON array of machine ids.
+  blockedDevices Json         @default("[]") @map("blocked_devices")
   redeemedAt     DateTime     @default(now()) @map("redeemed_at")
 
-  scriptIds String[] @default([]) @map("script_ids")
+  /// JSON array of script ids.
+  scriptIds Json     @default("[]") @map("script_ids")
 
   redemptions KeyRedemption[]
   devices     MemberDevice[]

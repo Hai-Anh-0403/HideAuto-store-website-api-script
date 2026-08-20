@@ -3,7 +3,7 @@
 Quick reference for Claude Code and development conventions.
 
 **storeAutoHide** is a **web store** for **automation scripts** (`.hideflow` workflows) used by the
-hideflow desktop app. It is a **pnpm monorepo**: a **NestJS + Prisma + PostgreSQL** API (`server/`)
+hideflow desktop app. It is a **pnpm monorepo**: a **NestJS + Prisma + MySQL** API (`server/`)
 and a **Next.js + TypeScript** seller portal (`web/`).
 
 ---
@@ -29,7 +29,7 @@ workflows, the store validates/scrubs them and lists them for sale; buyers brows
 ### Tech Stack
 - **Language**: TypeScript (strict) on Node 22+
 - **API**: NestJS 11 (Express platform), Swagger at `/docs`
-- **DB**: PostgreSQL via **Prisma 6** (`server/prisma/schema.prisma` is the source of truth)
+- **DB**: MySQL 8 via **Prisma 6** (`server/prisma/schema.prisma` is the source of truth)
 - **Frontend**: Next.js 15 App Router, React 19, plain CSS (`web/src/styles/`)
 - **Auth**: JWT (`@nestjs/jwt` + passport-jwt), password hashing with `bcrypt`
 - **Package manager**: **pnpm** (workspace at the repo root)
@@ -49,7 +49,7 @@ workflows, the store validates/scrubs them and lists them for sale; buyers brows
 ```bash
 pnpm install                  # install both packages from the repo root
 
-docker compose up -d postgres # or point DATABASE_URL at your own Postgres
+docker compose up -d mysql    # or point DATABASE_URL at your own MySQL
 cp server/.env.example server/.env
 
 pnpm db:push                  # apply schema.prisma to the database
@@ -136,6 +136,20 @@ web/
 - Query only inside services, through the injected `PrismaService`.
 - Use `select`/`include` deliberately and always paginate lists (`skip`/`take` + `PageDto`).
 - Never return the `password` column; select explicit fields on user-facing reads.
+
+**What MySQL costs us** (all three bite silently — the first two at build time, the third at run time):
+
+- **No scalar lists.** `String[]` is PostgreSQL-only in Prisma. Lists are `Json` columns holding
+  a JSON array; read them through `toStringArray()` in `common/json-array.ts`, never by
+  trusting the `JsonValue` to be an array. The wire format is unchanged, so `web/src/types.ts`
+  still declares `string[]`.
+- **No `mode: 'insensitive'`.** The MySQL connector rejects it. The server collation
+  (`utf8mb4_0900_ai_ci`) already compares case-insensitively — and accent-insensitively, so
+  `contains: 'vinh vien'` now matches "vĩnh viễn" where PostgreSQL would not have.
+- **No array functions in raw SQL.** `array_append`, `array_remove` and `= ANY(…)` do not
+  exist. `MembersService.setDeviceBlocked` takes a row lock and does the set arithmetic in
+  TypeScript instead; MySQL's `JSON_SEARCH` is not a substitute, it matches with LIKE
+  semantics and would read `_` and `%` in a machine id as wildcards.
 
 ### Next.js (web)
 
@@ -283,4 +297,4 @@ The buyer-facing key prompt lives in the **desktop app**, not here — see
 ---
 
 **Last updated**: 2026-08-18
-**Project**: storeAutoHide (NestJS + Prisma + PostgreSQL · Next.js + TypeScript)
+**Project**: storeAutoHide (NestJS + Prisma + MySQL · Next.js + TypeScript)

@@ -1,6 +1,6 @@
 # Cả project trong 1 lệnh:
 #
-#   docker compose up -d --build     # chạy tất cả (Postgres + server + web)
+#   docker compose up -d --build     # chạy tất cả (MySQL + server + web)
 #   docker compose logs -f server    # xem log
 #   docker compose stop              # tắt, giữ dữ liệu
 #   docker compose down -v           # xoá sạch cả dữ liệu
@@ -10,24 +10,30 @@
 name: store-autohide
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: sah-postgres
+  mysql:
+    image: mysql:8.4
+    container_name: sah-mysql
     restart: unless-stopped
+    # utf8mb4 all the way down: mini app names and descriptions are Vietnamese, and the
+    # 3-byte utf8 MySQL still defaults to in places cannot hold an emoji.
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: store_autohide
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: store_autohide
+      MYSQL_USER: store
+      MYSQL_PASSWORD: store
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - pg-data:/var/lib/postgresql/data
+      - db-data:/var/lib/mysql
+    # mysqladmin without credentials answers even while the server is still initialising,
+    # so the probe authenticates — that is the thing the API actually needs to work.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d store_autohide"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u store -pstore --silent"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 30s
 
   server:
     build:
@@ -36,10 +42,10 @@ services:
     container_name: sah-server
     restart: unless-stopped
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/store_autohide
+      DATABASE_URL: mysql://store:store@mysql:3306/store_autohide
       # Ghi đè bằng secret thật khi deploy — đừng dùng giá trị này ngoài máy local.
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRES_IN: 7d
@@ -100,7 +106,7 @@ services:
       - "3000:3000"
 
 volumes:
-  pg-data:
-    name: sah-pg-data
+  db-data:
+    name: sah-mysql-data
   server-storage:
     name: sah-server-storage

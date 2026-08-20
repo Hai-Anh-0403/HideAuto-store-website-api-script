@@ -28,7 +28,7 @@
 - **Layering**: controllers (thin) → services (business logic) → `PrismaService` (DB access)
 - **API boundary**: `class-validator` DTOs for all input; never return raw rows with secret columns
 - **Config**: env-driven via `ConfigService`; no hardcoded secrets or DB URLs
-- **Database**: PostgreSQL via Prisma; `server/prisma/schema.prisma` is the source of truth
+- **Database**: MySQL 8 via Prisma; `server/prisma/schema.prisma` is the source of truth
 - **Versioning**: routes live under `/api/v1` (declared on each `@Controller`)
 
 ## Code Style

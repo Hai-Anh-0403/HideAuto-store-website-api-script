@@ -26,8 +26,8 @@ export class StoreService {
     // Text search on name and short_description
     if (dto.q) {
       where.OR = [
-        { name: { contains: dto.q, mode: 'insensitive' } },
-        { shortDescription: { contains: dto.q, mode: 'insensitive' } },
+        { name: { contains: dto.q } },
+        { shortDescription: { contains: dto.q } },
       ];
     }
 

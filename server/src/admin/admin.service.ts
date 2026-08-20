@@ -6,6 +6,7 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 import { PageDto } from '../common/dto/page.dto';
 import { readScan } from '../common/graph/workflow-graph';
 import { ListSellersDto } from './dto/list-sellers.dto';
+import { toStringArray } from '../common/json-array';
 
 @Injectable()
 export class AdminService {
@@ -20,9 +21,9 @@ export class AdminService {
     if (dto.status) where.status = dto.status;
     if (dto.search) {
       where.OR = [
-        { name: { contains: dto.search, mode: 'insensitive' } },
-        { email: { contains: dto.search, mode: 'insensitive' } },
-        { contact: { contains: dto.search, mode: 'insensitive' } },
+        { name: { contains: dto.search } },
+        { email: { contains: dto.search } },
+        { contact: { contains: dto.search } },
       ];
     }
 
@@ -235,7 +236,7 @@ export class AdminService {
         latestVersionId: version.id,
         minAppVersion: version.minAppVersion,
         nodeCount: version.nodeCount,
-        nodeGroupsUsed: version.nodeGroupsUsed,
+        nodeGroupsUsed: toStringArray(version.nodeGroupsUsed),
         capabilities: version.capabilities ?? {},
       },
     });

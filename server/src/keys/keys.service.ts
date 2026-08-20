@@ -371,8 +371,8 @@ export class KeysService {
     if (dto.q) {
       and.push({
         OR: [
-          { key: { contains: dto.q, mode: 'insensitive' } },
-          { label: { contains: dto.q, mode: 'insensitive' } },
+          { key: { contains: dto.q } },
+          { label: { contains: dto.q } },
         ],
       });
     }

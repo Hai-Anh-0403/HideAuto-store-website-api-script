@@ -21,9 +21,9 @@ Chỗ này gây nhầm nhiều nhất, ghi lại cho rõ:
 
 | | Seller (portal store) | End-user (app + mini app) |
 |---|---|---|
-| Kho user | Postgres `sellers` của store | flowdesk (`flowdesk.hachitechsolution.com/api`) |
+| Kho user | MySQL `sellers` của store | flowdesk (`flowdesk.hachitechsolution.com/api`) |
 | Đăng nhập | `POST /api/v1/auth/login` → JWT của store | `POST /api/auth/login` → access + refresh của flowdesk |
-| Mật khẩu | bcrypt trong Postgres | do flowdesk giữ |
+| Mật khẩu | bcrypt trong MySQL | do flowdesk giữ |
 
 Store **không bao giờ** tạo hay xác thực tài khoản flowdesk; nó chỉ **kiểm tra token** người mua
 đưa lên (`GET /users/me`, `GET /devices` — cũ: `flowdesk_client.py`, chưa port sang NestJS).

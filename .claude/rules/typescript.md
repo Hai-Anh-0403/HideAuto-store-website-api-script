@@ -13,7 +13,7 @@
 
 - **Language**: TypeScript (strict) on Node 22+
 - **API**: NestJS 11 (Express platform) + Swagger at `/docs`
-- **DB**: PostgreSQL via Prisma 6 (`server/prisma/schema.prisma` is the source of truth)
+- **DB**: MySQL 8 via Prisma 6 (`server/prisma/schema.prisma` is the source of truth)
 - **Frontend**: Next.js 15 App Router + React 19
 - **Auth**: JWT (`@nestjs/jwt`, passport-jwt), `bcrypt` for password hashing
 - **Package manager**: pnpm workspace at the repo root

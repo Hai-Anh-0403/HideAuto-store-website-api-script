@@ -543,7 +543,7 @@ function DetailVersions({
         <div className="card-h"><h3>{t('versions.uploadTitle')}</h3></div>
         <form onSubmit={upload} style={{ padding: 16 }}>
           <label className="dropzone" style={{ display: 'block', cursor: 'pointer', marginBottom: 12 }}>
-            <input type="file" accept=".zip,.exe,.json,.workflow" className="hide" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <input type="file" accept=".zip,.exe" className="hide" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             {file ? (<>✓ <b>{file.name}</b></>) : t('versions.pick')}
           </label>
           {error != null && <div className="state bad">{errorText(error, 'upload.failed')}</div>}

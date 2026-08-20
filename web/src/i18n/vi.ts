@@ -131,7 +131,7 @@ export const vi = {
   'miniApps.hasZip': 'có .zip',
 
   'upload.title': 'Tải mini app lên',
-  'upload.pick': '⬆ Chọn gói {zip} (mini-app) hoặc file {json}',
+  'upload.pick': '⬆ Chọn gói mini app — {zip} hoặc {exe}',
   'upload.inspecting': 'Đang đọc và kiểm tra workflow…',
   'upload.name': 'Tên mini app',
   'upload.namePlaceholder': 'Lấy theo tên trong gói',

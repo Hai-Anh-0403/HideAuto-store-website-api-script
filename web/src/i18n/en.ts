@@ -133,7 +133,7 @@ export const en: Record<keyof typeof vi, string> = {
   'miniApps.hasZip': 'has .zip',
 
   'upload.title': 'Upload a mini app',
-  'upload.pick': '⬆ Pick a {zip} package (mini app) or an {json} file',
+  'upload.pick': '⬆ Pick a mini app package — {zip} or {exe}',
   'upload.inspecting': 'Reading and checking the workflow...',
   'upload.name': 'Mini app name',
   'upload.namePlaceholder': 'Taken from the package',

@@ -198,11 +198,11 @@ function UploadForm({
           style={{ marginTop: 8, marginBottom: 12, cursor: 'pointer' }}
           onClick={() => fileRef.current?.click()}
         >
-          <div>{file ? `✓ ${file.name}` : t('upload.pick', { zip: '.zip', json: '.json' })}</div>
+          <div>{file ? `✓ ${file.name}` : t('upload.pick', { zip: '.zip', exe: '.exe' })}</div>
           <input
             ref={fileRef}
             type="file"
-            accept=".zip,.json,.hideflow,.exe"
+            accept=".zip,.exe"
             onChange={handleFileChange}
             style={{ display: 'none' }}
           />

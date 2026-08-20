@@ -13,6 +13,7 @@ import { ConflictError, NotFoundError } from '../common/errors';
 import { PageDto } from '../common/dto/page.dto';
 import { ListMembersDto } from './dto/list-members.dto';
 import { UpdateAccessDto } from './dto/update-access.dto';
+import { toStringArray } from '../common/json-array';
 
 /** Matches the portal's own definition of "online" (web/src/lib/pills.ts). */
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
@@ -53,9 +54,9 @@ export class MembersService {
       // Email is what a seller usually has, but a support thread often only quotes a name
       // or the raw user id — so all three match.
       where.OR = [
-        { userEmail: { contains: dto.search, mode: 'insensitive' } },
-        { userName: { contains: dto.search, mode: 'insensitive' } },
-        { userId: { contains: dto.search, mode: 'insensitive' } },
+        { userEmail: { contains: dto.search } },
+        { userName: { contains: dto.search } },
+        { userId: { contains: dto.search } },
       ];
     }
     if (dto.status) {
@@ -97,7 +98,7 @@ export class MembersService {
       activationCount: device.activationCount,
       firstSeenAt: device.firstSeenAt,
       lastSeenAt: device.lastSeenAt,
-      blocked: member.blockedDevices.includes(device.machineId),
+      blocked: toStringArray(member.blockedDevices).includes(device.machineId),
     }));
   }
 
@@ -114,32 +115,43 @@ export class MembersService {
     machineId: string,
     blocked: boolean,
   ): Promise<SellerMember> {
-    const member = await this.owned(sellerId, memberId);
-    const has = member.blockedDevices.includes(machineId);
+    await this.owned(sellerId, memberId);
 
-    if (blocked && has) {
-      throw new ConflictError('device_already_blocked', 'Device is already blocked');
-    }
-    if (!blocked && !has) {
-      throw new ConflictError('device_not_blocked', 'Device is not blocked');
-    }
+    /*
+     * The list is a JSON column now, so there is no `array_append` to lean on: MySQL's
+     * JSON functions that could stand in (`JSON_SEARCH`) match with LIKE semantics, which
+     * would treat `_` and `%` in a machine id as wildcards and compare case-insensitively.
+     *
+     * A row lock gets the same guarantee the Postgres version was after — a block made a
+     * second earlier from another tab is still there when this one writes — without
+     * trusting string matching inside the database.
+     */
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM seller_members WHERE id = ${memberId} FOR UPDATE`;
 
-    // Let Postgres do the set arithmetic. Rewriting the whole array from the read above
-    // would drop a block made a second earlier from another tab.
-    if (blocked) {
-      await this.prisma.$executeRaw`
-        UPDATE seller_members
-           SET blocked_devices = array_append(blocked_devices, ${machineId})
-         WHERE id = ${memberId}
-           AND NOT (${machineId} = ANY(blocked_devices))`;
-    } else {
-      await this.prisma.$executeRaw`
-        UPDATE seller_members
-           SET blocked_devices = array_remove(blocked_devices, ${machineId})
-         WHERE id = ${memberId}`;
-    }
+      const row = await tx.sellerMember.findUniqueOrThrow({
+        where: { id: memberId },
+        select: { blockedDevices: true },
+      });
+      const current = toStringArray(row.blockedDevices);
+      const has = current.includes(machineId);
 
-    return this.prisma.sellerMember.findUniqueOrThrow({ where: { id: memberId } });
+      if (blocked && has) {
+        throw new ConflictError('device_already_blocked', 'Device is already blocked');
+      }
+      if (!blocked && !has) {
+        throw new ConflictError('device_not_blocked', 'Device is not blocked');
+      }
+
+      return tx.sellerMember.update({
+        where: { id: memberId },
+        data: {
+          blockedDevices: blocked
+            ? [...current, machineId]
+            : current.filter((device) => device !== machineId),
+        },
+      });
+    });
   }
 
   /** Grant or take back access to individual mini apps. */
@@ -167,7 +179,7 @@ export class MembersService {
       // an id already on the member can be a deleted app, and rejecting the whole payload
       // for it would freeze the editor — the seller could never change anything again.
       const added = unique.filter(
-        (id) => !member.scriptIds.includes(id) && !ownedIds.has(id),
+        (id) => !toStringArray(member.scriptIds).includes(id) && !ownedIds.has(id),
       );
       if (added.length) {
         throw new NotFoundError('script_not_found', 'Mini app not found');

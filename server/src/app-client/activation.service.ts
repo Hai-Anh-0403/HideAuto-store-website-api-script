@@ -18,6 +18,7 @@ import { LicenseService, type SignedLicense } from '../licensing/license.service
 import { ForbiddenError, NotFoundError } from '../common/errors';
 import { normalizeKeyCode } from '../keys/key-code';
 import type { BuyerIdentity } from './flowdesk.service';
+import { toStringArray } from '../common/json-array';
 
 @Injectable()
 export class ActivationService {
@@ -73,21 +74,22 @@ export class ActivationService {
 
       // A shop-wide key (scriptId === null) unlocks everything; otherwise add just that app.
       const shopWide = key.scriptId === null;
-      const scriptIds = new Set(existing?.scriptIds ?? []);
+      const scriptIds = new Set(toStringArray(existing?.scriptIds));
       if (key.scriptId) scriptIds.add(key.scriptId);
 
       const alreadyEntitled =
         existing !== null &&
         (shopWide
           ? existing.allScripts
-          : key.scriptId !== null && existing.scriptIds.includes(key.scriptId));
+          : key.scriptId !== null &&
+            toStringArray(existing.scriptIds).includes(key.scriptId));
 
       // Don't burn a use when the key grants nothing new — re-entering a key the buyer
       // already redeemed (a reinstall, say) shouldn't eat their remaining uses.
       if (!alreadyEntitled) {
         // Claim the use with the quota re-checked *inside* the update. The read above can
-        // go stale between two concurrent redeems; this cannot — Postgres locks the row,
-        // so the last remaining use is handed to exactly one of them.
+        // go stale between two concurrent redeems; this cannot — the database locks the
+        // row for the update, so the last remaining use goes to exactly one of them.
         const claimed = await tx.sellerKey.updateMany({
           where: {
             id: key.id,
@@ -170,7 +172,7 @@ export class ActivationService {
     const sellerIdsWithAll = memberships
       .filter((m) => m.allScripts)
       .map((m) => m.sellerId);
-    const scriptIds = memberships.flatMap((m) => m.scriptIds);
+    const scriptIds = memberships.flatMap((m) => toStringArray(m.scriptIds));
 
     if (!sellerIdsWithAll.length && !scriptIds.length) return [];
 
@@ -240,14 +242,20 @@ export class ActivationService {
         'Your access to this seller has been blocked',
       );
     }
-    if (!member || !(member.allScripts || member.scriptIds.includes(scriptId))) {
+    if (
+      !member ||
+      !(member.allScripts || toStringArray(member.scriptIds).includes(scriptId))
+    ) {
       // A key was supplied but still didn't unlock this app ⇒ it was for something else.
       throw new ForbiddenError(
         opts.key ? 'key_wrong_app' : 'key_required',
         'This mini app is not unlocked for your account',
       );
     }
-    if (opts.machineId && member.blockedDevices.includes(opts.machineId)) {
+    if (
+      opts.machineId &&
+      toStringArray(member.blockedDevices).includes(opts.machineId)
+    ) {
       throw new ForbiddenError(
         'device_blocked',
         'The seller blocked this device',

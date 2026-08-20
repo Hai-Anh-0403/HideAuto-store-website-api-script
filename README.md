@@ -4,7 +4,7 @@ Cửa hàng bán **mini app automation** (workflow `.hideflow`) cho app desktop 
 
 | Thư mục | Nội dung |
 |---|---|
-| [`server/`](./server) | NestJS + Prisma + PostgreSQL — REST API `/api/v1` |
+| [`server/`](./server) | NestJS + Prisma + MySQL — REST API `/api/v1` |
 | [`web/`](./web) | Next.js (App Router) + TypeScript — cổng seller |
 | [`docs/`](./docs) | Schema & luồng publish (nguồn sự thật) |
 
@@ -14,7 +14,7 @@ Monorepo dùng **pnpm workspace**; hai package `server` và `web` cài chung m�
 
 ## Chạy — 1 lệnh
 
-Chỉ cần **Docker**. Lệnh này dựng cả Postgres + server + web:
+Chỉ cần **Docker**. Lệnh này dựng cả MySQL + server + web:
 
 ```bash
 docker compose up -d --build
@@ -29,7 +29,7 @@ Server tự `prisma db push` + seed lúc khởi động, nên DB trống vẫn d
 
 > ⚠️ Mật khẩu admin mặc định đó nằm trong repo, ai cũng biết. Máy cá nhân thì tiện, còn
 > deploy ra chỗ truy cập được thì **bắt buộc** đặt `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `JWT_SECRET`
-> và đổi mật khẩu Postgres. Seed không bao giờ ghi đè mật khẩu của admin đã tồn tại.
+> và đổi mật khẩu MySQL. Seed không bao giờ ghi đè mật khẩu của admin đã tồn tại.
 
 Lần sau chỉ cần `docker compose up -d` (thêm `--build` khi code đổi) · `docker compose stop` để tắt ·
 `docker compose logs -f server` xem log · `docker compose down -v` xoá sạch cả dữ liệu.
@@ -39,10 +39,10 @@ Chi tiết ở [compose.yaml](./compose.yaml).
 
 ## Chạy kiểu dev (hot reload)
 
-Cần **Node 22+** và **pnpm**. Postgres vẫn chạy bằng Docker:
+Cần **Node 22+** và **pnpm**. MySQL vẫn chạy bằng Docker:
 
 ```bash
-docker compose up -d postgres
+docker compose up -d mysql
 ```
 
 ```bash
@@ -142,6 +142,6 @@ cd web && npx tsc --noEmit && pnpm lint
 
 ## Tài liệu
 
-- [server/prisma/schema.prisma](./server/prisma/schema.prisma) — schema PostgreSQL (nguồn sự thật)
+- [server/prisma/schema.prisma](./server/prisma/schema.prisma) — schema MySQL (nguồn sự thật)
 - [docs/script-publish-packaging.md](./docs/script-publish-packaging.md) — luồng upload → scrub → duyệt → đóng gói
 - [CLAUDE.md](./CLAUDE.md) — quy ước code
