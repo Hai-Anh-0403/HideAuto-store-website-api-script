@@ -60,6 +60,19 @@ services:
       FLOWDESK_BASE_URL: ${FLOWDESK_BASE_URL:-}
     ports:
       - "3001:3001"
+    # Probes a real public route rather than a dedicated endpoint, so a "healthy" server
+    # is one that has Nest routing *and* a working Prisma connection — not just an open
+    # socket. Node 22 has global fetch, so this needs nothing installed in the image.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/api/v1/store/scripts?limit=1').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     volumes:
       # Graph đã scrub + artifact build, giữ lại giữa các lần restart.
       - server-storage:/data/storage
@@ -77,8 +90,12 @@ services:
         NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost:3000}
     container_name: sah-web
     restart: unless-stopped
+    # Wait for the API to actually answer, not just for its container to exist: the
+    # first request into a portal whose backend is still running `prisma db push`
+    # otherwise fails, and the page renders its error state instead of the login form.
     depends_on:
-      - server
+      server:
+        condition: service_healthy
     ports:
       - "3000:3000"
 

@@ -1,4 +1,4 @@
-﻿node_modules
+node_modules
 **/node_modules
 **/dist
 **/.next
@@ -6,6 +6,10 @@
 .git
 .env
 **/.env
+# Scrubbed graphs and build artifacts written by a native `pnpm dev` run. The image
+# gets its own volume at /data/storage; copying a developer's local ones in would bake
+# stale seller data into a published image.
+server/var
 api
 ui
 docs
