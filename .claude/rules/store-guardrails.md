@@ -1,4 +1,4 @@
-# storeAutoHide Project Guardrails
+# Store-HideAuto Project Guardrails
 
 ## Prompt Defense Baseline
 

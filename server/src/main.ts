@@ -35,7 +35,7 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('storeAutoHide API')
+    .setTitle('Store-HideAuto API')
     .setDescription('Script marketplace API for hideflow automation scripts')
     .setVersion('1.0')
     .addBearerAuth()

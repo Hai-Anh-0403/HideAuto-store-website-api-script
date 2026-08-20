@@ -87,7 +87,7 @@ export default function LoginPage() {
       <div className="login-shell">
         <div className="login-hero">
           <BrandLogo size={56} detail />
-          <b>storeAutoHide</b>
+          <b>Store-HideAuto</b>
           <span className="sub">{t('login.tagline')}</span>
           <ul className="login-features">
             <li>

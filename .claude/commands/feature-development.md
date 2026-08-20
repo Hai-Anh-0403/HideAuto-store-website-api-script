@@ -1,6 +1,6 @@
 ---
 name: feature-development
-description: Workflow for implementing a new resource/endpoint in storeAutoHide (NestJS + Prisma, Next.js)
+description: Workflow for implementing a new resource/endpoint in Store-HideAuto (NestJS + Prisma, Next.js)
 allowed_tools: ["Bash", "Read", "Write", "Grep", "Glob"]
 ---
 

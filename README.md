@@ -1,4 +1,4 @@
-# storeAutoHide
+# Store-HideAuto
 
 Cửa hàng bán **mini app automation** (workflow `.hideflow`) cho app desktop **hideflow**.
 
@@ -70,7 +70,7 @@ bấm thử:
 
 ```bash
 pnpm db:seed:demo                      # khi chạy native (pnpm dev)
-docker exec sah-server node dist/seed-demo.js   # khi chạy bằng docker compose
+docker exec hideauto-server node dist/seed-demo.js   # khi chạy bằng docker compose
 ```
 
 > Đang chạy bằng docker mà seed từ host thì graph đã scrub sẽ nằm ở `server/var/storage` trên

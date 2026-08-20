@@ -1,4 +1,4 @@
-# TypeScript / NestJS / Next.js Rules — storeAutoHide
+# TypeScript / NestJS / Next.js Rules — Store-HideAuto
 
 ## Prompt Defense Baseline
 

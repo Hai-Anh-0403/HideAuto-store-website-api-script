@@ -7,15 +7,15 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Đăng nhập',
   description:
-    'Đăng nhập hoặc đăng ký tài khoản seller storeAutoHide để đăng mini app automation ' +
+    'Đăng nhập hoặc đăng ký tài khoản seller Store-HideAuto để đăng mini app automation ' +
     'cho hideflow, phát khoá kích hoạt và quản lý người mua.',
   alternates: { canonical: '/login' },
   // Next replaces the root `openGraph` wholesale rather than merging it, so `type` and
   // `siteName` have to be repeated here or the tags simply vanish on this page.
   openGraph: {
     type: 'website',
-    siteName: 'storeAutoHide',
-    title: 'Đăng nhập · storeAutoHide',
+    siteName: 'Store-HideAuto',
+    title: 'Đăng nhập · Store-HideAuto',
     description: 'Cổng seller — bán mini app automation cho hideflow.',
     url: '/login',
   },

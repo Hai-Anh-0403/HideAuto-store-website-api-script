@@ -7,12 +7,12 @@
 #
 # Web: http://localhost:3000 · API/Swagger: http://localhost:3001/docs
 # Muốn hot reload khi code thì chạy native: `pnpm install && pnpm dev`.
-name: store-autohide
+name: store-hideauto
 
 services:
   mysql:
     image: mysql:8.4
-    container_name: sah-mysql
+    container_name: hideauto-mysql
     restart: unless-stopped
     # utf8mb4 all the way down: mini app names and descriptions are Vietnamese, and the
     # 3-byte utf8 MySQL still defaults to in places cannot hold an emoji.
@@ -39,7 +39,7 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile
-    container_name: sah-server
+    container_name: hideauto-server
     restart: unless-stopped
     depends_on:
       mysql:
@@ -94,7 +94,7 @@ services:
         # Only feeds `metadataBase` (absolute OG/icon URLs). Override when the portal
         # is served from a real domain.
         NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost:3000}
-    container_name: sah-web
+    container_name: hideauto-web
     restart: unless-stopped
     # Wait for the API to actually answer, not just for its container to exist: the
     # first request into a portal whose backend is still running `prisma db push`
@@ -107,6 +107,6 @@ services:
 
 volumes:
   db-data:
-    name: sah-mysql-data
+    name: hideauto-mysql-data
   server-storage:
-    name: sah-server-storage
+    name: hideauto-server-storage

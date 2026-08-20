@@ -1,5 +1,5 @@
 {
-  "name": "store-autohide",
+  "name": "store-hideauto",
   "private": true,
   "// packageManager": "Pins the pnpm corepack resolves — without it the Docker build picks a newer pnpm than the host and rejects this lockfile.",
   "packageManager": "pnpm@10.6.1",

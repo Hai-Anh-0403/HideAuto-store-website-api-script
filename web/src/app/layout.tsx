@@ -12,18 +12,18 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'storeAutoHide',
+    default: 'Store-HideAuto',
     // Pages set the leaf; the brand is appended once, here, instead of in every title.
-    template: '%s · storeAutoHide',
+    template: '%s · Store-HideAuto',
   },
   description:
-    'Cổng seller của storeAutoHide: đăng mini app automation cho hideflow, phát khoá ' +
+    'Cổng seller của Store-HideAuto: đăng mini app automation cho hideflow, phát khoá ' +
     'kích hoạt và quản lý người mua.',
-  applicationName: 'storeAutoHide',
+  applicationName: 'Store-HideAuto',
   openGraph: {
     type: 'website',
-    siteName: 'storeAutoHide',
-    title: 'storeAutoHide',
+    siteName: 'Store-HideAuto',
+    title: 'Store-HideAuto',
     description: 'Cổng seller — bán mini app automation cho hideflow.',
     url: '/',
   },

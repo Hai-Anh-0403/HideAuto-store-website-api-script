@@ -62,7 +62,7 @@ function PortalFrame({ children }: { children: React.ReactNode }) {
       <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-brand">
           <BrandLogo size={28} />
-          <b style={{ marginLeft: 8 }}>storeAutoHide</b>
+          <b style={{ marginLeft: 8 }}>Store-HideAuto</b>
           <span className="sub">{t('nav.tagline')}</span>
         </div>
         <nav className="sidebar-nav">

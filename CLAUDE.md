@@ -1,8 +1,8 @@
-# storeAutoHide — Project Configuration for Claude Code
+# Store-HideAuto — Project Configuration for Claude Code
 
 Quick reference for Claude Code and development conventions.
 
-**storeAutoHide** is a **web store** for **automation scripts** (`.hideflow` workflows) used by the
+**Store-HideAuto** is a **web store** for **automation scripts** (`.hideflow` workflows) used by the
 hideflow desktop app. It is a **pnpm monorepo**: a **NestJS + Prisma + MySQL** API (`server/`)
 and a **Next.js + TypeScript** seller portal (`web/`).
 
@@ -297,4 +297,4 @@ The buyer-facing key prompt lives in the **desktop app**, not here — see
 ---
 
 **Last updated**: 2026-08-18
-**Project**: storeAutoHide (NestJS + Prisma + MySQL · Next.js + TypeScript)
+**Project**: Store-HideAuto (NestJS + Prisma + MySQL · Next.js + TypeScript)

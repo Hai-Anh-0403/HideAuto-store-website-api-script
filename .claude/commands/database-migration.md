@@ -1,6 +1,6 @@
 ---
 name: database-migration
-description: MySQL schema changes & data migrations for storeAutoHide (Prisma)
+description: MySQL schema changes & data migrations for Store-HideAuto (Prisma)
 allowed_tools: ["Bash", "Read", "Write", "Grep", "Glob"]
 ---
 

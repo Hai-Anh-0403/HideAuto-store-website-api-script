@@ -57,9 +57,13 @@ const ahead = (days: number) => new Date(Date.now() + days * DAY);
  * `generateKeyCode()` is random by design, which would mint four new keys on every run.
  * Hashing the fixture's seed into the same alphabet keeps the demo idempotent and still
  * shows the seller exactly the shape of code the API issues.
+ *
+ * The salt is part of that determinism: change the string and every demo code changes
+ * with it. Harmless — `seedKeys` deletes the codes from a previous salt by label — but
+ * anyone holding an old code on a laptop finds it gone after the next seed.
  */
 const stableKeyCode = (seed: string) => {
-  const digest = createHash('sha256').update(`storeAutoHide:key:${seed}`).digest();
+  const digest = createHash('sha256').update(`store-hideauto:key:${seed}`).digest();
   let body = '';
   for (let i = 0; i < KEY_CODE_LENGTH; i++) {
     body += KEY_CODE_ALPHABET[digest[i] % KEY_CODE_ALPHABET.length];
@@ -70,7 +74,7 @@ const stableKeyCode = (seed: string) => {
 /** Stable fake key/user ids: same input ⇒ same value, so re-runs stay idempotent. */
 const stableHex = (seed: string, bytes: number) =>
   createHash('sha256')
-    .update(`storeAutoHide:demo:${seed}`)
+    .update(`store-hideauto:demo:${seed}`)
     .digest('hex')
     .slice(0, bytes * 2);
 

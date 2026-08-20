@@ -1,6 +1,6 @@
-# .claude — Project Configuration for storeAutoHide
+# .claude — Project Configuration for Store-HideAuto
 
-Configuration and agents for **storeAutoHide** — a store that sells **automation scripts**
+Configuration and agents for **Store-HideAuto** — a store that sells **automation scripts**
 (`.hideflow` workflows) for the hideflow desktop app.
 
 Stack: **TypeScript monorepo (pnpm)** — **NestJS + Prisma + PostgreSQL** (`server/`) and
@@ -41,7 +41,7 @@ Stack: **TypeScript monorepo (pnpm)** — **NestJS + Prisma + PostgreSQL** (`ser
 - **`.claude/rules/store-guardrails.md`** — guardrails, commit workflow, architecture layering, review checklist.
 
 ### Identity (`identity.json`)
-- Project: storeAutoHide
+- Project: Store-HideAuto
 - Domains: typescript, nestjs, prisma, postgresql, nextjs, react, rest-api
 - Package Manager: **pnpm**
 
@@ -86,4 +86,4 @@ Stack: **TypeScript monorepo (pnpm)** — **NestJS + Prisma + PostgreSQL** (`ser
 
 ---
 
-**Project**: storeAutoHide (NestJS + Prisma + PostgreSQL · Next.js + TypeScript)
+**Project**: Store-HideAuto (NestJS + Prisma + PostgreSQL · Next.js + TypeScript)
