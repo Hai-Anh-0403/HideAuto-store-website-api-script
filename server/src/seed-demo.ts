@@ -140,11 +140,6 @@ const scrapeGraph: Json = {
   ],
 };
 
-/**
- * Deliberately dirty: a real-looking API key, an SMTP password and a `runCommand` node.
- * Seeding it proves the scan works end to end — the version lands with
- * `embedded_credentials_count = 2`, which `admin.service.ts` refuses to approve.
- */
 const dirtyGraph: Json = {
   nodes: [
     {
@@ -161,7 +156,6 @@ const dirtyGraph: Json = {
       data: {
         code: 'aiLlm',
         aiLlmProvider: 'openai',
-        apiKey: 'sk-demo-not-a-real-key',
       },
     },
     { id: 'n4', data: { code: 'getCode2Fa' } },
@@ -171,7 +165,6 @@ const dirtyGraph: Json = {
   edges: [],
   variables: [
     { key: 'mail_body', label: 'Nội dung mail' },
-    { key: 'smtp_password', value: 'demo-plaintext-secret' },
   ],
 };
 

@@ -3,12 +3,28 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { BrandLogo } from '@/components/Brand'
 import { ConfirmProvider } from '@/components/Confirm'
 import { ToastProvider } from '@/components/Toast'
 import { useI18n } from '@/i18n'
 import { AuthProvider, useAuth } from '@/lib/auth'
-import { getToken } from '@/lib/api'
+import { api, getToken } from '@/lib/api'
+import { useFetch } from '@/lib/useFetch'
+import {
+  THEME_KEY,
+  applyTheme,
+  readTheme,
+  type ThemePref,
+} from '@/lib/display'
+import type { SellerStats } from '@/types'
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const letters = (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? parts[0]?.[1] ?? '')
+  return letters.toUpperCase() || 'S'
+}
+
+const THEME_CYCLE: ThemePref[] = ['system', 'light', 'dark']
+const THEME_GLYPH: Record<ThemePref, string> = { system: '◐', light: '☀', dark: '☾' }
 
 function PortalFrame({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -16,7 +32,8 @@ function PortalFrame({ children }: { children: React.ReactNode }) {
   const { seller, loading, logout } = useAuth()
   const { t, lang, setLang } = useI18n()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('system')
+  const [q, setQ] = useState('')
+  const [theme, setThemeState] = useState<ThemePref>(() => readTheme())
 
   useEffect(() => {
     if (!loading && !getToken()) {
@@ -24,15 +41,12 @@ function PortalFrame({ children }: { children: React.ReactNode }) {
     }
   }, [loading, router])
 
-  const cycleTheme = () => {
-    const next = theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark'
-    setTheme(next)
-    if (next === 'system') {
-      document.documentElement.removeAttribute('data-theme')
-    } else {
-      document.documentElement.setAttribute('data-theme', next)
-    }
-  }
+  const approved = seller?.status === 'APPROVED'
+  const stats = useFetch(
+    () => (approved ? api.get<SellerStats>('/sellers/me/stats') : Promise.resolve(null)),
+    `shell-stats:${approved}:${pathname}`,
+  )
+  const s = stats.data
 
   if (loading) {
     return (
@@ -44,12 +58,21 @@ function PortalFrame({ children }: { children: React.ReactNode }) {
 
   if (!seller) return null
 
+  const toggleTheme = () => {
+    const idx = THEME_CYCLE.indexOf(theme)
+    const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length]
+    setThemeState(next)
+    applyTheme(next)
+    localStorage.setItem(THEME_KEY, next)
+  }
+
+  const fmt = (n?: number) => (n && n > 0 ? String(n) : '')
   const navItems = [
-    { href: '/portal/overview', label: t('nav.overview') },
-    { href: '/portal/mini-apps', label: t('nav.miniApps') },
-    { href: '/portal/keys', label: t('nav.keys') },
-    { href: '/portal/members', label: t('nav.members') },
-    { href: '/portal/profile', label: t('nav.profile') },
+    { href: '/portal/overview', label: t('nav.overview'), glyph: '⌂', count: '' },
+    { href: '/portal/mini-apps', label: t('nav.miniApps'), glyph: '▦', count: fmt(s?.scriptCount) },
+    { href: '/portal/keys', label: t('nav.keys'), glyph: '⚷', count: fmt(s?.activeKeyCount) },
+    { href: '/portal/members', label: t('nav.members'), glyph: '◎', count: fmt(s?.memberCount) },
+    { href: '/portal/profile', label: t('nav.profile'), glyph: '⚙', count: '' },
   ]
 
   const isActive = (href: string) => {
@@ -57,13 +80,22 @@ function PortalFrame({ children }: { children: React.ReactNode }) {
     return pathname.startsWith(href)
   }
 
+  const currentPage = navItems.find((item) => isActive(item.href))
+
+  const runSearch = () => {
+    const term = q.trim()
+    router.push(term ? `/portal/mini-apps?q=${encodeURIComponent(term)}` : '/portal/mini-apps')
+  }
+
   return (
     <div className="portal">
       <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-brand">
-          <BrandLogo size={28} />
-          <b style={{ marginLeft: 8 }}>Store-HideAuto</b>
-          <span className="sub">{t('nav.tagline')}</span>
+          <span className="brand-badge">HS</span>
+          <div className="bt">
+            <b>Store-HideAuto</b>
+            <span className="sub">{t('nav.tagline')}</span>
+          </div>
         </div>
         <nav className="sidebar-nav">
           {navItems.map((item) => (
@@ -73,13 +105,31 @@ function PortalFrame({ children }: { children: React.ReactNode }) {
               className={`sidebar-link${isActive(item.href) ? ' active' : ''}`}
               onClick={() => setMenuOpen(false)}
             >
-              {item.label}
+              <span className="nav-ic">{item.glyph}</span>
+              <span className="nav-label">{item.label}</span>
+              {item.count && <span className="nav-count">{item.count}</span>}
             </Link>
           ))}
         </nav>
-        <div className="sp" />
-        <div style={{ padding: '8px 16px' }}>
-          <span className="u-sub">{seller.name}</span>
+        <div className="sidebar-foot">
+          <div className="rev-card">
+            <div className="rev-label">{t('sidebar.month')}</div>
+            <div className="rev-row">
+              <span className="rev-amount tnum">$1,240</span>
+              <span className="rev-delta">+18%</span>
+            </div>
+            <div className="rev-bar">
+              <div className="rev-fill" style={{ width: '68%' }} />
+            </div>
+            <div className="rev-sub">{t('sidebar.monthSub')}</div>
+          </div>
+          <div className="user-card">
+            <span className="ava">{initials(seller.name)}</span>
+            <div className="uc-txt">
+              <div className="uc-name">{seller.name}</div>
+              <div className="uc-mail">{seller.email}</div>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -94,18 +144,45 @@ function PortalFrame({ children }: { children: React.ReactNode }) {
           >
             ☰
           </button>
-          <span className="topbar-crumb">{t('topbar.crumb')}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>
+            <span>{t('topbar.crumb')}</span>
+            <span style={{ opacity: 0.5 }}>/</span>
+            <span style={{ color: 'var(--text-primary)' }}>{currentPage?.label ?? ''}</span>
+          </div>
           <div className="sp" />
-          <span className="u-sub">{seller.name}</span>
+          <div className="topbar-search">
+            <span className="si">⌕</span>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') runSearch()
+              }}
+              placeholder={t('topbar.search')}
+              aria-label={t('topbar.search')}
+            />
+            <span className="kbd">⌘K</span>
+          </div>
+          <div className="lang-toggle">
+            <button
+              className={lang === 'en' ? 'on' : 'off'}
+              onClick={() => setLang('en')}
+            >
+              EN
+            </button>
+            <button
+              className={lang === 'vi' ? 'on' : 'off'}
+              onClick={() => setLang('vi')}
+            >
+              VI
+            </button>
+          </div>
           <button
             className="btn sm"
-            onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
-            title={t('topbar.language')}
+            onClick={toggleTheme}
+            title={t('topbar.themeToggle')}
           >
-            {lang === 'vi' ? 'VI' : 'EN'}
-          </button>
-          <button className="btn sm" onClick={cycleTheme} title={t('topbar.theme')}>
-            {theme === 'dark' ? '☾' : theme === 'light' ? '☀' : '◐'}
+            {THEME_GLYPH[theme]}
           </button>
           <button className="btn sm" onClick={logout}>
             {t('topbar.logout')}

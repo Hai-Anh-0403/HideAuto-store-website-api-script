@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { Pager } from '@/components/Pager'
 import { PendingBanner } from '@/components/PendingBanner'
 import { Pill } from '@/components/Pill'
+import { ContextMenu, useContextMenu } from '@/components/ContextMenu'
 import { useConfirm } from '@/components/Confirm'
 import { useToast } from '@/components/Toast'
 import { useI18n } from '@/i18n'
@@ -39,12 +40,20 @@ export default function KeysPage() {
   const approved = seller?.status === 'APPROVED'
   const { toast } = useToast()
   const confirm = useConfirm()
+  const menu = useContextMenu()
 
   const [skip, setSkip] = useState(0)
   const [state, setState] = useState<StateFilter>('ALL')
   const [scriptId, setScriptId] = useState('')
   const [q, setQ] = useState('')
-  const [creating, setCreating] = useState(false)
+  // Right-click "Generate key" on a mini app lands here as ?new=<scriptId>: open the form,
+  // pre-selecting that app.
+  const [initialNewScript] = useState(() =>
+    typeof window !== 'undefined'
+      ? (new URLSearchParams(window.location.search).get('new') ?? '')
+      : '',
+  )
+  const [creating, setCreating] = useState(() => Boolean(initialNewScript))
   const [fresh, setFresh] = useState<KeyItem[]>([])
   const [editing, setEditing] = useState<string | null>(null)
 
@@ -122,6 +131,7 @@ export default function KeysPage() {
 
   return (
     <>
+      <ContextMenu state={menu.state} close={menu.close} />
       <div className="vhead">
         <div>
           <h2>{t('keys.title')}</h2>
@@ -161,7 +171,14 @@ export default function KeysPage() {
         <div className="state bad">{keys.error ?? stats.error}</div>
       )}
 
-      {creating && <CreateKeys apps={apps} onCreate={create} onCancel={() => setCreating(false)} />}
+      {creating && (
+        <CreateKeys
+          apps={apps}
+          initialScriptId={initialNewScript}
+          onCreate={create}
+          onCancel={() => setCreating(false)}
+        />
+      )}
 
       {fresh.length > 0 && (
         <FreshKeys
@@ -272,10 +289,81 @@ export default function KeysPage() {
                       }
                     />
                   ) : (
-                    <tr key={k.id}>
+                    <tr
+                      key={k.id}
+                      onContextMenu={(e) =>
+                        menu.open(e, [
+                          {
+                            label: t('keys.copy'),
+                            icon: '⧉',
+                            onClick: () => copy(k.key, t('keys.copied')),
+                          },
+                          {
+                            label: t('keys.edit'),
+                            icon: '✎',
+                            onClick: () => setEditing(k.id),
+                          },
+                          k.status === 'REVOKED'
+                            ? {
+                                label: t('keys.restore'),
+                                icon: '↺',
+                                sep: true,
+                                onClick: () =>
+                                  void run(async () => {
+                                    await api.patch(`/keys/${k.id}/restore`)
+                                    reload()
+                                    return t('keys.restored')
+                                  }),
+                              }
+                            : {
+                                label: t('keys.revoke'),
+                                icon: '⊘',
+                                danger: true,
+                                sep: true,
+                                onClick: () =>
+                                  void confirm({
+                                    title: t('keys.revoke'),
+                                    body: t('keys.revokeConfirm'),
+                                    confirmLabel: t('keys.revoke'),
+                                    danger: true,
+                                  }).then(({ ok }) => {
+                                    if (!ok) return
+                                    void run(async () => {
+                                      await api.patch(`/keys/${k.id}/revoke`)
+                                      reload()
+                                      return t('keys.revoked')
+                                    }, 'keys.revokeFailed')
+                                  }),
+                              },
+                          ...(k.usedCount === 0
+                            ? [
+                                {
+                                  label: t('keys.delete'),
+                                  icon: '⌦',
+                                  danger: true,
+                                  onClick: () =>
+                                    void confirm({
+                                      title: t('keys.delete'),
+                                      body: t('keys.deleteConfirm'),
+                                      confirmLabel: t('keys.delete'),
+                                      danger: true,
+                                    }).then(({ ok }) => {
+                                      if (!ok) return
+                                      void run(async () => {
+                                        await api.del(`/keys/${k.id}`)
+                                        reload()
+                                        return t('keys.deleted')
+                                      })
+                                    }),
+                                },
+                              ]
+                            : []),
+                        ])
+                      }
+                    >
                       <td>
                         <button
-                          className="keychip"
+                          className="keychip copyable"
                           title={t('keys.copy')}
                           style={{ cursor: 'pointer', border: 0 }}
                           onClick={() => copy(k.key, t('keys.copied'))}
@@ -394,14 +482,16 @@ function CreateKeys({
   apps,
   onCreate,
   onCancel,
+  initialScriptId,
 }: {
   apps: Script[]
+  initialScriptId?: string
   onCreate: (payload: KeyCreate) => Promise<void>
   onCancel: () => void
 }) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [scriptId, setScriptId] = useState('')
+  const [scriptId, setScriptId] = useState(initialScriptId ?? '')
   const [label, setLabel] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [maxUses, setMaxUses] = useState('1')
@@ -547,7 +637,7 @@ function FreshKeys({
           {keys.map((k) => (
             <button
               key={k.id}
-              className="keychip"
+              className="keychip copyable"
               title={t('keys.copy')}
               style={{ cursor: 'pointer', border: 0 }}
               onClick={() => onCopy(k.key, t('keys.copied'))}

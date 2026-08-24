@@ -5,9 +5,13 @@ import { useRouter } from 'next/navigation'
 import { Pager } from '@/components/Pager'
 import { PendingBanner } from '@/components/PendingBanner'
 import { Pill } from '@/components/Pill'
+import { AppIcon } from '@/components/AppIcon'
+import { ContextMenu, useContextMenu } from '@/components/ContextMenu'
+import { useToast } from '@/components/Toast'
 import { useI18n } from '@/i18n'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { copyText } from '@/lib/clipboard'
 import { fmtCount, scriptPill, scriptStatus } from '@/lib/pills'
 import { useDebounced } from '@/lib/useDebounced'
 import { useFetch } from '@/lib/useFetch'
@@ -36,9 +40,16 @@ export default function MiniAppsPage() {
   const { t, lang } = useI18n()
   useTitle(t('miniApps.title'))
   const router = useRouter()
+  const { toast } = useToast()
+  const menu = useContextMenu()
   const approved = seller?.status === 'APPROVED'
   const [skip, setSkip] = useState(0)
-  const [q, setQ] = useState('')
+  // Seed the search box from the topbar search (?q=…) on first load.
+  const [q, setQ] = useState(() =>
+    typeof window !== 'undefined'
+      ? (new URLSearchParams(window.location.search).get('q') ?? '')
+      : '',
+  )
   const [status, setStatus] = useState<ScriptStatus | ''>('')
   const [sort, setSort] = useState<ScriptSort>('newest')
 
@@ -72,6 +83,7 @@ export default function MiniAppsPage() {
 
   return (
     <>
+      <ContextMenu state={menu.state} close={menu.close} />
       <div className="vhead">
         <div>
           <h2>{t('miniApps.title')}</h2>
@@ -164,10 +176,40 @@ export default function MiniAppsPage() {
                       key={s.id}
                       className="rowlink"
                       onClick={() => router.push(`/portal/mini-apps/${s.id}`)}
+                      onContextMenu={(e) =>
+                        menu.open(e, [
+                          {
+                            label: t('miniApps.ctx.open'),
+                            icon: '↗',
+                            onClick: () => router.push(`/portal/mini-apps/${s.id}`),
+                          },
+                          {
+                            label: t('miniApps.ctx.genKey'),
+                            icon: '⚷',
+                            onClick: () => router.push(`/portal/keys?new=${s.id}`),
+                          },
+                          {
+                            label: t('miniApps.ctx.copySlug'),
+                            icon: '⧉',
+                            sep: true,
+                            onClick: () =>
+                              void copyText(s.slug).then((ok) =>
+                                toast(ok ? t('miniApps.ctx.copiedSlug') : t('keys.copyFailed')),
+                              ),
+                          },
+                        ])
+                      }
                     >
                       <td>
-                        <div className="u-main">{s.name}</div>
-                        {s.shortDescription && <div className="u-sub">{s.shortDescription}</div>}
+                        <div className="app-cell">
+                          <AppIcon name={s.name} />
+                          <div style={{ minWidth: 0 }}>
+                            <div className="u-main">{s.name}</div>
+                            {s.shortDescription && (
+                              <div className="u-sub">{s.shortDescription}</div>
+                            )}
+                          </div>
+                        </div>
                       </td>
                       <td>
                         <div className="chips">

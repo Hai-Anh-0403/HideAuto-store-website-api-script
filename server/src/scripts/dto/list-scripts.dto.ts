@@ -28,6 +28,16 @@ export class ListScriptsDto extends PaginationDto {
   search?: string;
 
   @ApiPropertyOptional({
+    description:
+      'Comma-separated tag IDs. A listing must carry every tag given (AND), matching the store catalogue filter.',
+    example: 'tag-id-1,tag-id-2',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  tagIds?: string;
+
+  @ApiPropertyOptional({
     enum: SCRIPT_STATUSES,
     description: 'Restrict to one listing status.',
   })

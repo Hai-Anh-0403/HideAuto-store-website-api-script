@@ -32,9 +32,12 @@ export default function ProfilePage() {
 
       <PendingBanner />
 
-      <StoreInfo seller={seller} onSaved={refresh} />
+      <div className="profile-grid">
+        <StoreInfo seller={seller} onSaved={refresh} />
+        <SecurityCard onChanged={() => setDevicesKey((n) => n + 1)} />
+      </div>
+
       <Devices key={devicesKey} logout={logout} />
-      <ChangePassword onChanged={() => setDevicesKey((n) => n + 1)} />
     </>
   )
 }
@@ -68,22 +71,25 @@ function StoreInfo({ seller, onSaved }: { seller: Seller; onSaved: () => void })
 
   return (
     <div className="card">
-      <div className="card-h">
-        <h3>{t('profile.info.title')}</h3>
-        <div className="sp" />
+      <div className="ov-card-h">
+        <h3 style={{ flex: 1 }}>{t('profile.info.title')}</h3>
         <Pill tone={status.tone}>{t(status.key)}</Pill>
       </div>
-      <form onSubmit={save} style={{ padding: 16 }}>
+      <form onSubmit={save} style={{ padding: 18 }}>
         {error != null && <div className="state bad">{errorText(error)}</div>}
-        <div className="kv">
-          <span className="klab">{t('profile.email')}</span>
-          <span className="mono">{seller.email}</span>
+        <div className="grid2" style={{ gap: 14, marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <span className="rev-label">{t('profile.email')}</span>
+            <span className="mono" style={{ fontSize: 13 }}>{seller.email}</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <span className="rev-label">{t('profile.joined')}</span>
+            <span className="mono" style={{ fontSize: 13 }}>
+              {new Date(seller.createdAt).toLocaleDateString(lang)}
+            </span>
+          </div>
         </div>
-        <div className="kv">
-          <span className="klab">{t('profile.joined')}</span>
-          <span>{new Date(seller.createdAt).toLocaleDateString(lang)}</span>
-        </div>
-        <div className="grid2" style={{ marginTop: 12 }}>
+        <div className="grid2" style={{ gap: 14 }}>
           <label className="field">
             <span>{t('profile.name')}</span>
             <input
@@ -106,15 +112,99 @@ function StoreInfo({ seller, onSaved }: { seller: Seller; onSaved: () => void })
             />
           </label>
         </div>
-        <div className="formrow">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
           <button className="btn pri sm" type="submit" disabled={busy || !dirty}>
             {busy ? t('profile.saving') : t('profile.save')}
           </button>
+          <span className="note">{t('profile.foot')}</span>
         </div>
       </form>
-      <div className="card-foot">
-        <span className="note">{t('profile.foot')}</span>
-      </div>
+    </div>
+  )
+}
+
+function SecurityCard({ onChanged }: { onChanged: () => void }) {
+  const { t } = useI18n()
+  const { toast } = useToast()
+  const errorText = useErrorText()
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [mismatch, setMismatch] = useState(false)
+  const [error, setError] = useState<unknown>(null)
+  const [twoFa, setTwoFa] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setMismatch(false)
+    if (!next) return
+    setBusy(true)
+    try {
+      await api.patch('/sellers/me/password', {
+        oldPassword: current,
+        newPassword: next,
+      })
+      toast(t('profile.pw.changed'))
+      setCurrent('')
+      setNext('')
+      onChanged()
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em' }}>
+        {t('profile.security')}
+      </h3>
+      {mismatch && <div className="state bad">{t('profile.pw.mismatch')}</div>}
+      {error != null && <div className="state bad">{errorText(error)}</div>}
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <label className="field" style={{ marginBottom: 0 }}>
+          <span>{t('profile.pw.current')}</span>
+          <input
+            className="input"
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            required
+          />
+        </label>
+        <label className="field" style={{ marginBottom: 0 }}>
+          <span>{t('profile.pw.new')}</span>
+          <input
+            className="input"
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            minLength={8}
+            maxLength={128}
+            required
+          />
+        </label>
+        <div className="twofa-row">
+          <div>
+            <div className="twofa-label">{t('profile.twoFa')}</div>
+            <div className="twofa-sub">{t('profile.twoFaSub')}</div>
+          </div>
+          <button
+            type="button"
+            className={`toggle-switch ${twoFa ? 'on' : 'off'}`}
+            onClick={() => setTwoFa(!twoFa)}
+          >
+            <span className="knob" />
+          </button>
+        </div>
+        <button className="btn" type="submit" disabled={busy}>
+          {busy ? t('profile.pw.submitting') : t('profile.updatePw')}
+        </button>
+      </form>
     </div>
   )
 }
@@ -158,9 +248,8 @@ function Devices({ logout }: { logout: () => void }) {
 
   return (
     <div className="card">
-      <div className="card-h">
-        <h3>{t('profile.devices.title')}</h3>
-        <div className="sp" />
+      <div className="ov-card-h">
+        <h3 style={{ flex: 1 }}>{t('profile.devices.title')}</h3>
         <button className="btn sm" onClick={signOutOthers} disabled={busy != null || !others}>
           {t('profile.devices.signOutOthers')}
         </button>
@@ -216,100 +305,6 @@ function Devices({ logout }: { logout: () => void }) {
       )}
       <div className="card-foot">
         <span className="note">{t('profile.devices.foot')}</span>
-      </div>
-    </div>
-  )
-}
-
-function ChangePassword({ onChanged }: { onChanged: () => void }) {
-  const { t } = useI18n()
-  const { toast } = useToast()
-  const errorText = useErrorText()
-  const [current, setCurrent] = useState('')
-  const [next, setNext] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [mismatch, setMismatch] = useState(false)
-  const [error, setError] = useState<unknown>(null)
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setMismatch(next !== confirm)
-    if (next !== confirm) return
-    setBusy(true)
-    try {
-      await api.patch('/sellers/me/password', {
-        oldPassword: current,
-        newPassword: next,
-      })
-      toast(t('profile.pw.changed'))
-      setCurrent('')
-      setNext('')
-      setConfirm('')
-      onChanged()
-    } catch (err) {
-      setError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="card">
-      <div className="card-h">
-        <h3>{t('profile.pw.title')}</h3>
-      </div>
-      <form onSubmit={submit} style={{ padding: 16 }}>
-        {mismatch && <div className="state bad">{t('profile.pw.mismatch')}</div>}
-        {error != null && <div className="state bad">{errorText(error)}</div>}
-        <div style={{ maxWidth: 440 }}>
-          <label className="field">
-            <span>{t('profile.pw.current')}</span>
-            <input
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-              required
-            />
-          </label>
-          <label className="field">
-            <span>{t('profile.pw.new')}</span>
-            <input
-              className="input"
-              type="password"
-              autoComplete="new-password"
-              value={next}
-              onChange={(e) => setNext(e.target.value)}
-              minLength={8}
-              maxLength={128}
-              required
-            />
-          </label>
-          <label className="field">
-            <span>{t('profile.pw.confirm')}</span>
-            <input
-              className="input"
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              minLength={8}
-              maxLength={128}
-              required
-            />
-          </label>
-        </div>
-        <div className="formrow">
-          <button className="btn pri sm" type="submit" disabled={busy}>
-            {busy ? t('profile.pw.submitting') : t('profile.pw.submit')}
-          </button>
-        </div>
-      </form>
-      <div className="card-foot">
-        <span className="note">{t('profile.pw.foot')}</span>
       </div>
     </div>
   )

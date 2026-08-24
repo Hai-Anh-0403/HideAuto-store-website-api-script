@@ -14,6 +14,8 @@ const here = dirname(fileURLToPath(import.meta.url))
 const apiOrigin = process.env.API_ORIGIN ?? 'http://localhost:3001'
 
 const config: NextConfig = {
+  // Hide the floating Next.js dev overlay/logo in the corner during `next dev`.
+  devIndicators: false,
   // Self-contained server bundle, but only when the Docker build asks for it: tracing
   // pnpm's linked deps needs symlinks, which a non-elevated Windows build can't create.
   output: process.env.BUILD_STANDALONE ? 'standalone' : undefined,

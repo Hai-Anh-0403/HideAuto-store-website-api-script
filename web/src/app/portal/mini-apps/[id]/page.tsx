@@ -341,8 +341,6 @@ function DetailOverview({
       <div className="card">
         <div className="card-h">
           <h3>{t('detail.caps.title')}</h3>
-          <div className="sp" />
-          <span className="ep"><b>{t('common.auto')}</b> {t('common.fromGraph')}</span>
         </div>
         <div className="card-body">
           <div className="kv">
@@ -365,9 +363,7 @@ function DetailOverview({
           <div className="kv">
             <span className="klab">{t('detail.caps.deps')}</span>{' '}
             {latest?.subWorkflowIds.length ? (
-              latest.subWorkflowIds.map((w) => (
-                <span key={w} className="keychip" style={{ marginRight: 5 }}>{w}</span>
-              ))
+              <b>{t('detail.caps.depsCount', { count: latest.subWorkflowIds.length })}</b>
             ) : (
               <span className="u-sub">{t('detail.caps.noDeps')}</span>
             )}
@@ -551,6 +547,7 @@ function EditListing({ s, onSaved }: { s: ScriptDetail; onSaved: () => void }) {
 
 function Moderation({ s, latest, onSubmit }: { s: ScriptDetail; latest: ScriptVersion | undefined; onSubmit: () => void }) {
   const { t } = useI18n()
+  const { toast } = useToast()
   const creds = latest?.scan.embedded_credentials_count ?? 0
 
   if (s.status === 'PUBLISHED') {
@@ -559,7 +556,7 @@ function Moderation({ s, latest, onSubmit }: { s: ScriptDetail; latest: ScriptVe
         <span className="bi">✓</span>
         <div>
           <b>{t('detail.moderation.published')}</b>
-          {s.capabilities.uses_shell ? t('detail.moderation.publishedShell') : t('detail.moderation.publishedNoShell')}
+          {s.capabilities.uses_shell && t('detail.moderation.publishedShell')}
         </div>
       </div>
     )
@@ -570,7 +567,7 @@ function Moderation({ s, latest, onSubmit }: { s: ScriptDetail; latest: ScriptVe
         <span className="bi">⏳</span>
         <div>
           <b>{t('detail.moderation.pending')}</b>
-          {t('detail.moderation.pendingBody', { count: creds })}
+          {t('detail.moderation.pendingBody')}
         </div>
       </div>
     )
@@ -586,13 +583,37 @@ function Moderation({ s, latest, onSubmit }: { s: ScriptDetail; latest: ScriptVe
         <button className="btn pri sm" onClick={onSubmit}>{t('detail.moderation.submit')}</button>
       </div>
       {creds > 0 && (
-        <div className="card-foot">
-          <span className="note">
-            {t('detail.moderation.credWarning', { count: creds })}{' '}
-            {latest?.scan.credential_paths.map((p) => (
-              <span key={p} className="keychip" style={{ marginRight: 8 }}>🔑 {p}</span>
-            ))}
-          </span>
+        <div className="credguard" style={{ margin: '0 16px 14px' }}>
+          <div className="credguard-h">
+            <span className="cg-ic">🔒</span>
+            <div className="cg-txt">
+              <span className="cg-ttl">{t('detail.moderation.credTitle', { count: creds })}</span>
+              <span className="cg-sub">{t('detail.moderation.credHint')}</span>
+            </div>
+          </div>
+          {(latest?.scan.credential_paths.length ?? 0) > 0 && (
+            <details className="techdetails">
+              <summary>{t('detail.moderation.credDetails')}</summary>
+              {latest?.scan.credential_paths.map((p) => (
+                <div key={p} className="credrow">
+                  <span className="cr-ic">🔑</span>
+                  <code>{p}</code>
+                  <button
+                    className="btn sm"
+                    type="button"
+                    title={t('detail.moderation.credCopy')}
+                    onClick={() =>
+                      void copyText(p).then((ok) =>
+                        toast(ok ? t('detail.moderation.credCopied') : t('keys.copyFailed')),
+                      )
+                    }
+                  >
+                    {t('detail.moderation.credCopy')}
+                  </button>
+                </div>
+              ))}
+            </details>
+          )}
         </div>
       )}
     </div>
@@ -752,12 +773,7 @@ function DetailVersions({
                             ) : v.scan.embedded_credentials_count === 0 ? (
                               <span>{t('versions.cleanScan')}</span>
                             ) : (
-                              <span>
-                                {t('versions.dirtyScan', { count: v.scan.embedded_credentials_count })}{' '}
-                                {v.scan.credential_paths.map((p) => (
-                                  <span key={p} className="keychip" style={{ marginRight: 8 }}>🔑 {p}</span>
-                                ))}
-                              </span>
+                              <span>{t('versions.dirtyScan', { count: v.scan.embedded_credentials_count })}</span>
                             )}
                           </div>
                           <div className="kv">

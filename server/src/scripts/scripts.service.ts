@@ -124,6 +124,14 @@ export class ScriptsService {
         { shortDescription: { contains: dto.search } },
       ];
     }
+    // Tag filter — a listing must carry every tag given (AND), the same rule the store
+    // catalogue uses. The implicit AND with `where.OR` keeps search and tags both required.
+    const tagIds = dto.tagIds
+      ? dto.tagIds.split(',').map((id) => id.trim()).filter(Boolean)
+      : [];
+    if (tagIds.length) {
+      where.AND = tagIds.map((id) => ({ tags: { some: { id } } }));
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.script.findMany({

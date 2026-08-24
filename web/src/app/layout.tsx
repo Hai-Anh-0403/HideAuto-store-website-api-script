@@ -46,12 +46,26 @@ export const viewport: Viewport = {
   colorScheme: 'dark light',
 }
 
+// Applied before paint so a saved theme never flashes the default first. Kept in
+// lockstep with `src/lib/display.ts` (same keys, same allowed values).
+const applyDisplayPrefs = `(function(){try{var e=document.documentElement,t=localStorage.getItem('ui.theme');if(t==='light'||t==='dark')e.setAttribute('data-theme',t);}catch(_){}})();`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // `lang` is the server's best guess; HtmlLang corrects it once the stored locale is
   // readable. suppressHydrationWarning covers that and the theme attribute.
   return (
     <html lang="vi" suppressHydrationWarning>
+      <head>
+        {/* Design system fonts: Manrope for text, JetBrains Mono for figures. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: applyDisplayPrefs }} />
         <HtmlLang />
         {children}
       </body>

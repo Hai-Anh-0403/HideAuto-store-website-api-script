@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { Pager } from '@/components/Pager'
 import { PendingBanner } from '@/components/PendingBanner'
 import { Pill } from '@/components/Pill'
+import { ContextMenu, useContextMenu } from '@/components/ContextMenu'
 import { useToast } from '@/components/Toast'
 import { useI18n } from '@/i18n'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { copyText } from '@/lib/clipboard'
 import { useErrorText } from '@/lib/errors'
 import { fmtWhen, isOnline } from '@/lib/pills'
 import { useDebounced } from '@/lib/useDebounced'
@@ -27,6 +29,7 @@ export default function MembersPage() {
   const errorText = useErrorText()
   const approved = seller?.status === 'APPROVED'
   const { toast } = useToast()
+  const menu = useContextMenu()
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<StatusFilter>('ALL')
   const [skip, setSkip] = useState(0)
@@ -81,6 +84,7 @@ export default function MembersPage() {
 
   return (
     <>
+      <ContextMenu state={menu.state} close={menu.close} />
       <div className="vhead">
         <div>
           <h2>{t('members.title')}</h2>
@@ -170,6 +174,34 @@ export default function MembersPage() {
                     onToggleBlock={() => toggleBlock(m)}
                     onChanged={() => members.reload()}
                     run={run}
+                    onContext={(e) =>
+                      menu.open(e, [
+                        {
+                          label: open === m.id ? t('members.hideDetail') : t('members.showDetail'),
+                          icon: '≡',
+                          onClick: () => setOpen(open === m.id ? null : m.id),
+                        },
+                        ...(m.userEmail
+                          ? [
+                              {
+                                label: t('members.copyEmail'),
+                                icon: '⧉',
+                                onClick: () =>
+                                  void copyText(m.userEmail ?? '').then((ok) =>
+                                    toast(ok ? t('members.emailCopied') : t('keys.copyFailed')),
+                                  ),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: m.status === 'BLOCKED' ? t('members.unblock') : t('members.block'),
+                          icon: m.status === 'BLOCKED' ? '✓' : '⊘',
+                          danger: m.status !== 'BLOCKED',
+                          sep: true,
+                          onClick: () => toggleBlock(m),
+                        },
+                      ])
+                    }
                   />
                 ))}
               </tbody>
@@ -199,6 +231,7 @@ function MemberRow({
   onToggleBlock,
   onChanged,
   run,
+  onContext,
 }: {
   member: Member
   scripts: Script[]
@@ -209,12 +242,13 @@ function MemberRow({
   onToggleBlock: () => void
   onChanged: () => void
   run: (action: () => Promise<string>) => void
+  onContext: (e: React.MouseEvent) => void
 }) {
   const { t } = useI18n()
 
   return (
     <>
-      <tr>
+      <tr onContextMenu={onContext}>
         <td>
           <div className="u-main">{member.userName ?? member.userEmail ?? t('common.dash')}</div>
           <div className="u-sub">{member.userEmail}</div>
