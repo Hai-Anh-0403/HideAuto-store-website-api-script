@@ -1,5 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
 import {
+  HttpException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
+import {
+  BadRequestError,
   ConflictError,
   ForbiddenError,
   NotFoundError,
@@ -12,8 +23,23 @@ import { CreateScriptDto } from './dto/create-script.dto';
 import { UpdateScriptDto } from './dto/update-script.dto';
 import { CreateVersionDto } from './dto/create-version.dto';
 import { ListScriptsDto } from './dto/list-scripts.dto';
+import { UploadMiniAppDto } from './dto/upload-mini-app.dto';
 import { PageDto } from '../common/dto/page.dto';
-import { extractPackage } from '../common/graph/package-extract';
+import {
+  EMPTY_GRAPH,
+  extractPackage,
+  type ExtractedPackage,
+} from '../common/graph/package-extract';
+import {
+  exeFileSlug,
+  isHaupFilename,
+  looksLikeHaup2,
+  MiniAppContainerError,
+  parseMiniAppContainer,
+  validSemver,
+  type MiniAppHeader,
+  type ParsedMiniAppContainer,
+} from '../common/graph/mini-app-container';
 import {
   deriveMetadata,
   emptyCapabilities,
@@ -33,16 +59,120 @@ interface IngestedUpload {
   graphExtracted: boolean;
   appId: string | null;
   appName: string | null;
+  wrapperVersion: string | null;
+  iconUrl: string | null;
   metadata: GraphMetadata;
   scan: GraphScan;
 }
 
 @Injectable()
 export class ScriptsService {
+  private readonly logger = new Logger(ScriptsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly config: ConfigService,
   ) {}
+
+  private wrapperPrivateKey(): string {
+    return this.config.get<string>('MINI_APP_WRAPPER_PRIVATE_KEY', '').trim();
+  }
+
+  /** One-slot dump so `scripts/debug-haup-decrypt.mjs` can inspect the real file. */
+  private dumpFailedHaup(buf: Buffer): void {
+    try {
+      const dir = join(process.cwd(), 'var');
+      mkdirSync(dir, { recursive: true });
+      const dest = join(dir, 'debug-last-failed.haup');
+      writeFileSync(dest, buf);
+      this.logger.warn(
+        `HAUP2 decrypt failed — dumped ${buf.length} bytes to ${dest}`,
+      );
+    } catch (dumpErr) {
+      this.logger.warn(
+        `Could not dump failed .haup: ${dumpErr instanceof Error ? dumpErr.message : dumpErr}`,
+      );
+    }
+  }
+
+  /**
+   * `.haup` is the wrapped installer (layer A). Unwrap it, then extract the graph from
+   * the inner exe the same way a raw `.zip`/`.exe` is handled. Identity (appId / name /
+   * version / icon) comes from the wrapper, not from the seller's form.
+   */
+  private async openUpload(file: Express.Multer.File): Promise<{
+    pkg: ExtractedPackage;
+    wrapper: ParsedMiniAppContainer | null;
+  }> {
+    let bytes = file.buffer;
+    let filename = file.originalname;
+    let wrapper: ParsedMiniAppContainer | null = null;
+
+    if (looksLikeHaup2(bytes) || isHaupFilename(filename)) {
+      try {
+        wrapper = parseMiniAppContainer(bytes, this.wrapperPrivateKey());
+      } catch (err) {
+        if (
+          err instanceof MiniAppContainerError &&
+          err.code === 'wrapper_decrypt_failed'
+        ) {
+          this.dumpFailedHaup(bytes);
+        }
+        throw err;
+      }
+      bytes = wrapper.exe;
+      filename = `${exeFileSlug(wrapper.header.name)}-setup.exe`;
+      return {
+        pkg: await this.extractGraphSafe(bytes, filename),
+        wrapper,
+      };
+    }
+
+    return { pkg: await extractPackage(bytes, filename), wrapper };
+  }
+
+  /** An unreadable inner exe is an opaque build — never fail the request here. */
+  private async extractGraphSafe(
+    bytes: Buffer,
+    filename: string,
+  ): Promise<ExtractedPackage> {
+    try {
+      return await extractPackage(bytes, filename);
+    } catch {
+      return {
+        graph: structuredClone(EMPTY_GRAPH),
+        delivery: 'mini_app_exe',
+        appName: null,
+        appId: null,
+        workflowId: null,
+        workflowName: null,
+        graphExtracted: false,
+      };
+    }
+  }
+
+  private mediaUrl(ref: string): string {
+    return `/api/v1/media/${ref.split('/').map(encodeURIComponent).join('/')}`;
+  }
+
+  /** Best-effort icon: any throw is swallowed, matching the Manager handler. */
+  private async storeWrapperIcon(
+    header: MiniAppHeader,
+    overwriteKey?: string,
+  ): Promise<string | null> {
+    if (!header.iconPng) return null;
+    try {
+      const iconBuf = Buffer.from(header.iconPng, 'base64');
+      if (!iconBuf.length) return null;
+      const stored = overwriteKey
+        ? await this.storage.saveAs(overwriteKey, iconBuf)
+        : await this.storage.saveBytes(iconBuf, 'media', 'icon.png');
+      return this.mediaUrl(stored.ref);
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Parse an upload, scrub embedded credentials, and derive listing metadata.
@@ -51,25 +181,37 @@ export class ScriptsService {
    * secrets) are discarded. Metadata comes from the graph itself, never from the seller.
    */
   private async ingest(file: Express.Multer.File): Promise<IngestedUpload> {
-    const pkg = await extractPackage(file.buffer, file.originalname);
+    const { pkg, wrapper } = await this.openUpload(file);
     const { graph, scan } = scrubCredentials(pkg.graph);
 
     // Persist the scrubbed graph, not the upload: a rejected publish must not leave
-    // seller secrets sitting in storage.
+    // seller secrets sitting in storage. The unwrapped exe is not kept — it may still
+    // hold secrets inside resources/app.workflow.
     const stored = await this.storage.saveBytes(
       Buffer.from(JSON.stringify(graph), 'utf8'),
       'graphs',
       `${file.originalname}.json`,
     );
 
+    const iconUrl = wrapper
+      ? await this.storeWrapperIcon(wrapper.header)
+      : null;
+    const exeChecksum = wrapper
+      ? createHash('sha256').update(wrapper.exe).digest('hex')
+      : stored.checksum;
+
     return {
       fileUrl: stored.ref,
-      sourceChecksum: stored.checksum,
-      sourceFilename: file.originalname,
+      sourceChecksum: exeChecksum,
+      sourceFilename: wrapper
+        ? `${exeFileSlug(wrapper.header.name)}-setup.exe`
+        : file.originalname,
       delivery: pkg.delivery,
       graphExtracted: pkg.graphExtracted,
-      appId: pkg.appId,
-      appName: pkg.appName,
+      appId: wrapper?.header.appId || pkg.appId,
+      appName: wrapper?.header.name || pkg.appName,
+      wrapperVersion: wrapper?.header.version ?? null,
+      iconUrl,
       metadata: pkg.graphExtracted
         ? deriveMetadata(graph)
         : {
@@ -105,6 +247,356 @@ export class ScriptsService {
       scan: ingested.scan as unknown as object,
       scannedAt: new Date(),
     };
+  }
+
+  /**
+   * `POST /api/apps/upload` — unwrap a `.haup`, persist the decoded exe (+ icon),
+   * upsert `Script` / `ScriptVersion` / `MiniAppBuild`. See
+   * `docs/mini-app-upload-server.md`. Identity always comes from the wrapper.
+   */
+  async uploadMiniApp(
+    sellerId: string,
+    dto: UploadMiniAppDto,
+    file?: Express.Multer.File,
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestError('file_required', 'Thiếu file');
+    }
+
+    const mode = dto.mode ?? 'PUBLIC';
+
+    let parsed: ParsedMiniAppContainer;
+    try {
+      parsed = parseMiniAppContainer(file.buffer, this.wrapperPrivateKey());
+    } catch (err) {
+      if (
+        err instanceof MiniAppContainerError &&
+        err.code === 'wrapper_decrypt_failed'
+      ) {
+        this.dumpFailedHaup(file.buffer);
+      }
+      if (err instanceof MiniAppContainerError) throw err;
+      throw new BadRequestError(
+        'wrapper_invalid',
+        'Không đọc được file mini-app',
+      );
+    }
+
+    try {
+      return await this.persistUnwrappedUpload(sellerId, dto, mode, parsed);
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      throw new InternalServerErrorException({
+        detail: err instanceof Error ? err.message : 'Upload lỗi',
+        code: 'upload_failed',
+      });
+    }
+  }
+
+  private async persistUnwrappedUpload(
+    sellerId: string,
+    dto: UploadMiniAppDto,
+    mode: 'PUBLIC' | 'LICENSE',
+    parsed: ParsedMiniAppContainer,
+  ) {
+    const { header, exe } = parsed;
+    const exeName = `${exeFileSlug(header.name)}-setup.exe`;
+    const exeKey = `mini-apps/${header.appId}/${header.version}/${exeName}`;
+    const exeStored = await this.storage.saveAs(exeKey, exe);
+
+    const iconUrl = await this.storeWrapperIcon(
+      header,
+      `mini-apps/${header.appId}/icon.png`,
+    );
+
+    const pkg = await this.extractGraphSafe(exe, exeName);
+    const { graph, scan } = scrubCredentials(pkg.graph);
+    const graphStored = await this.storage.saveBytes(
+      Buffer.from(JSON.stringify(graph), 'utf8'),
+      'graphs',
+      `${exeName}.json`,
+    );
+
+    const ingested: IngestedUpload = {
+      fileUrl: graphStored.ref,
+      sourceChecksum: exeStored.checksum,
+      sourceFilename: exeName,
+      delivery: 'mini_app_exe',
+      graphExtracted: pkg.graphExtracted,
+      appId: header.appId,
+      appName: header.name,
+      wrapperVersion: header.version,
+      iconUrl,
+      metadata: pkg.graphExtracted
+        ? deriveMetadata(graph)
+        : {
+            node_count: 0,
+            node_groups_used: [],
+            uses_control_flow: false,
+            sub_workflow_ids: [],
+            capabilities: emptyCapabilities(),
+            required_variables: [],
+          },
+      scan,
+    };
+
+    const owned = await this.findOwnedByAppId(sellerId, header.appId);
+    const versionRow = owned
+      ? await this.upsertOwnedVersion(owned.script.id, header.version, dto, ingested)
+      : await this.createOwnedListing(sellerId, header, dto, ingested);
+
+    await this.upsertUploadBuild({
+      scriptId: versionRow.scriptId,
+      scriptVersionId: versionRow.id,
+      header,
+      exeStored,
+    });
+
+    const listingPatch: Prisma.ScriptUpdateInput = {
+      name: header.name,
+      hasMiniApp: true,
+      ...(dto.shortDescription !== undefined && {
+        shortDescription: dto.shortDescription,
+      }),
+      ...(dto.description !== undefined && {
+        description: dto.description.trim()
+          ? sanitizeDescription(dto.description)
+          : null,
+      }),
+      ...(dto.videoUrl !== undefined && { videoUrl: dto.videoUrl || null }),
+      ...(dto.minAppVersion ? { minAppVersion: dto.minAppVersion } : {}),
+      ...(iconUrl ? { thumbnailUrl: dto.thumbnailUrl || iconUrl } : {}),
+      ...(dto.thumbnailUrl && !iconUrl ? { thumbnailUrl: dto.thumbnailUrl } : {}),
+    };
+    if (dto.images !== undefined) {
+      listingPatch.images = JSON.stringify(
+        dto.images
+          .split(',')
+          .filter(Boolean)
+          .filter((u) => /^https?:\/\//i.test(u)),
+      );
+    }
+    const tagIds = dto.tagIds
+      ? dto.tagIds.split(',').map((id) => id.trim()).filter(Boolean)
+      : [];
+    if (tagIds.length) {
+      listingPatch.tags = { set: tagIds.map((id) => ({ id })) };
+    }
+
+    await this.prisma.script.update({
+      where: { id: versionRow.scriptId },
+      data: listingPatch,
+    });
+
+    return {
+      ok: true as const,
+      appId: header.appId,
+      name: header.name,
+      version: header.version,
+      mode,
+      downloadUrl: this.mediaUrl(exeStored.ref),
+      iconUrl,
+      fileSize: exeStored.sizeBytes,
+      checksumSha256: exeStored.checksum,
+      scriptId: versionRow.scriptId,
+    };
+  }
+
+  /**
+   * Locate the listing that already claimed this wrapper `appId`. Re-upload must not
+   * steal another seller's row — `builderId` is first-claim only.
+   */
+  private async findOwnedByAppId(sellerId: string, appId: string) {
+    const row = await this.prisma.scriptVersion.findFirst({
+      where: { appId },
+      include: { script: { select: { id: true, sellerId: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!row) return null;
+    if (row.script.sellerId !== sellerId) {
+      throw new ConflictError(
+        'app_id_taken',
+        'Mini-app này thuộc seller khác',
+      );
+    }
+    return { script: row.script, version: row };
+  }
+
+  private async createOwnedListing(
+    sellerId: string,
+    header: MiniAppHeader,
+    dto: UploadMiniAppDto,
+    ingested: IngestedUpload,
+  ) {
+    const seller = await this.prisma.seller.findUnique({
+      where: { id: sellerId },
+      select: { name: true },
+    });
+    if (!seller) {
+      throw new NotFoundException('Seller not found');
+    }
+
+    const slug = await this.generateUniqueSlug(header.name);
+    const tagIds = dto.tagIds
+      ? dto.tagIds.split(',').map((id) => id.trim()).filter(Boolean)
+      : [];
+
+    const script = await this.prisma.script.create({
+      data: {
+        name: header.name,
+        slug,
+        shortDescription: dto.shortDescription,
+        description: dto.description?.trim()
+          ? sanitizeDescription(dto.description)
+          : undefined,
+        videoUrl: dto.videoUrl || undefined,
+        thumbnailUrl: dto.thumbnailUrl || ingested.iconUrl || undefined,
+        images: dto.images
+          ? JSON.stringify(
+              dto.images
+                .split(',')
+                .filter(Boolean)
+                .filter((u) => /^https?:\/\//i.test(u)),
+            )
+          : undefined,
+        minAppVersion: dto.minAppVersion || undefined,
+        sellerId,
+        sellerName: seller.name,
+        status: 'DRAFT',
+        hasMiniApp: true,
+        nodeCount: ingested.metadata.node_count,
+        nodeGroupsUsed: ingested.metadata.node_groups_used,
+        capabilities: ingested.metadata.capabilities as unknown as object,
+        tags: tagIds.length
+          ? { connect: tagIds.map((id) => ({ id })) }
+          : undefined,
+      },
+    });
+
+    const version = await this.prisma.scriptVersion.create({
+      data: {
+        scriptId: script.id,
+        version: header.version,
+        changelog: dto.changelog || undefined,
+        minAppVersion: dto.minAppVersion || undefined,
+        status: 'PENDING_REVIEW',
+        ...this.versionData(ingested),
+      },
+    });
+
+    await this.prisma.script.update({
+      where: { id: script.id },
+      data: {
+        latestVersion: version.version,
+        latestVersionId: version.id,
+      },
+    });
+
+    return version;
+  }
+
+  /**
+   * Same appId + same version → overwrite file fields. New version → new row; do not
+   * move `latestVersion*` once anything is APPROVED.
+   */
+  private async upsertOwnedVersion(
+    scriptId: string,
+    versionNumber: string,
+    dto: UploadMiniAppDto,
+    ingested: IngestedUpload,
+  ) {
+    const existing = await this.prisma.scriptVersion.findUnique({
+      where: { scriptId_version: { scriptId, version: versionNumber } },
+    });
+
+    if (existing) {
+      return this.prisma.scriptVersion.update({
+        where: { id: existing.id },
+        data: {
+          changelog: dto.changelog || existing.changelog,
+          minAppVersion: dto.minAppVersion || existing.minAppVersion,
+          status:
+            existing.status === 'APPROVED'
+              ? existing.status
+              : 'PENDING_REVIEW',
+          ...this.versionData(ingested),
+        },
+      });
+    }
+
+    const version = await this.prisma.scriptVersion.create({
+      data: {
+        scriptId,
+        version: versionNumber,
+        changelog: dto.changelog || undefined,
+        minAppVersion: dto.minAppVersion || undefined,
+        status: 'PENDING_REVIEW',
+        ...this.versionData(ingested),
+      },
+    });
+
+    const approvedCount = await this.prisma.scriptVersion.count({
+      where: { scriptId, status: 'APPROVED' },
+    });
+    if (approvedCount === 0) {
+      await this.prisma.script.update({
+        where: { id: scriptId },
+        data: {
+          latestVersion: version.version,
+          latestVersionId: version.id,
+          ...(dto.minAppVersion ? { minAppVersion: dto.minAppVersion } : {}),
+          hasMiniApp: true,
+          nodeCount: ingested.metadata.node_count,
+          nodeGroupsUsed: ingested.metadata.node_groups_used,
+          capabilities: ingested.metadata.capabilities as unknown as object,
+        },
+      });
+    }
+
+    return version;
+  }
+
+  private async upsertUploadBuild(opts: {
+    scriptId: string;
+    scriptVersionId: string;
+    header: MiniAppHeader;
+    exeStored: { ref: string; checksum: string; sizeBytes: number };
+  }) {
+    const existing = await this.prisma.miniAppBuild.findFirst({
+      where: {
+        scriptVersionId: opts.scriptVersionId,
+        builtBy: 'upload',
+      },
+    });
+    const data = {
+      appId: opts.header.appId,
+      appName: opts.header.name,
+      appVersion: opts.header.version,
+      fileUrl: opts.exeStored.ref,
+      sizeBytes: opts.exeStored.sizeBytes,
+      checksum: opts.exeStored.checksum,
+      status: 'READY' as const,
+      builtBy: 'upload',
+      builtAt: new Date(),
+      error: null,
+      installerFormat: 'exe',
+    };
+    if (existing) {
+      await this.prisma.miniAppBuild.update({
+        where: { id: existing.id },
+        data,
+      });
+      return;
+    }
+    await this.prisma.miniAppBuild.create({
+      data: {
+        scriptId: opts.scriptId,
+        scriptVersionId: opts.scriptVersionId,
+        platform: 'win',
+        arch: 'x64',
+        ...data,
+      },
+    });
   }
 
   /**
@@ -184,7 +676,8 @@ export class ScriptsService {
     }
 
     const ingested = file ? await this.ingest(file) : null;
-    const slug = await this.generateUniqueSlug(dto.name);
+    const listingName = dto.name || ingested?.appName || 'Untitled';
+    const slug = await this.generateUniqueSlug(listingName);
 
     const tagIds = dto.tagIds
       ? dto.tagIds.split(',').map((id) => id.trim()).filter(Boolean)
@@ -192,14 +685,14 @@ export class ScriptsService {
 
     const script = await this.prisma.script.create({
       data: {
-        name: dto.name,
+        name: listingName,
         slug,
         shortDescription: dto.shortDescription,
         description: dto.description
           ? sanitizeDescription(dto.description)
           : undefined,
         videoUrl: dto.videoUrl || undefined,
-        thumbnailUrl: dto.thumbnailUrl || undefined,
+        thumbnailUrl: dto.thumbnailUrl || ingested?.iconUrl || undefined,
         images: dto.images
           ? JSON.stringify(
               dto.images
@@ -226,12 +719,12 @@ export class ScriptsService {
       },
     });
 
-    // The first version. The seller names it — a shop porting an app that is already at
-    // 2.3.0 elsewhere should not have to call it 1.0.0 and then immediately re-upload.
+    // Version number prefers the wrapper (innerHeader) over the form — the seller can
+    // still type one when the file is not a .haup.
     const version = await this.prisma.scriptVersion.create({
       data: {
         scriptId: script.id,
-        version: dto.version ?? '1.0.0',
+        version: ingested?.wrapperVersion ?? dto.version ?? '1.0.0',
         changelog: dto.changelog,
         minAppVersion: dto.minAppVersion,
         status: 'PENDING_REVIEW',
@@ -362,9 +855,22 @@ export class ScriptsService {
    * derived metadata — and any embedded secrets — before committing to a version.
    */
   async inspectFile(file: Express.Multer.File) {
-    const pkg = await extractPackage(file.buffer, file.originalname);
+    if (!file) {
+      throw new BadRequestError('file_required', 'A file is required');
+    }
+
+    const { pkg, wrapper } = await this.openUpload(file);
     const { graph, scan } = scrubCredentials(pkg.graph);
-    const metadata = deriveMetadata(graph);
+    const metadata: GraphMetadata = pkg.graphExtracted
+      ? deriveMetadata(graph)
+      : {
+          node_count: 0,
+          node_groups_used: [],
+          uses_control_flow: false,
+          sub_workflow_ids: [],
+          capabilities: emptyCapabilities(),
+          required_variables: [],
+        };
 
     return {
       filename: file.originalname,
@@ -378,6 +884,17 @@ export class ScriptsService {
       embeddedCredentialsCount: scan.embedded_credentials_count,
       credentialPaths: scan.credential_paths,
       usesShell: scan.uses_shell,
+      name: wrapper?.header.name ?? pkg.appName,
+      version:
+        validSemver(wrapper?.header.version) ??
+        wrapper?.header.version ??
+        null,
+      appId: wrapper?.header.appId || pkg.appId,
+      appName: wrapper?.header.name || pkg.appName,
+      hasIcon: Boolean(wrapper?.header.iconPng),
+      iconDataUrl: wrapper?.header.iconPng
+        ? `data:image/png;base64,${wrapper.header.iconPng}`
+        : null,
     };
   }
 
@@ -395,25 +912,26 @@ export class ScriptsService {
       throw new NotFoundException('Script not found');
     }
 
+    const ingested = file ? await this.ingest(file) : null;
+    const versionNumber = ingested?.wrapperVersion ?? dto.version;
+
     const existingVersion = await this.prisma.scriptVersion.findUnique({
       where: {
-        scriptId_version: { scriptId, version: dto.version },
+        scriptId_version: { scriptId, version: versionNumber },
       },
     });
 
     if (existingVersion) {
       throw new ConflictError(
         'version_exists',
-        `Version ${dto.version} already exists for this script`,
+        `Version ${versionNumber} already exists for this script`,
       );
     }
-
-    const ingested = file ? await this.ingest(file) : null;
 
     const version = await this.prisma.scriptVersion.create({
       data: {
         scriptId,
-        version: dto.version,
+        version: versionNumber,
         changelog: dto.changelog,
         minAppVersion: dto.minAppVersion,
         status: 'PENDING_REVIEW',

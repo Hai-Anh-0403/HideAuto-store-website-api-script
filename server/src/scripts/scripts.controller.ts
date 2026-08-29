@@ -67,7 +67,7 @@ export class ScriptsController {
 
   @Post('inspect')
   @ApiOperation({
-    summary: 'Scan a file without saving it (pre-upload preview)',
+    summary: 'Scan a .haup (or raw package) without saving it (pre-upload preview)',
   })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', UPLOAD_LIMITS))

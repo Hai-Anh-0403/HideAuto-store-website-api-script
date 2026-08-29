@@ -53,17 +53,26 @@ export class BuildsController {
   }
 
   @Get(':id/download')
-  @ApiOperation({ summary: 'Download a packaged build' })
+  @ApiOperation({ summary: 'Download a packaged build (or unwrapped exe for upload builds)' })
   async download(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const { filename, body } = await this.buildsService.download(user.id, id);
+    const { filename, body, contentType } = await this.buildsService.download(
+      user.id,
+      id,
+    );
     res.set({
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type': contentType,
+      'Content-Disposition': contentDisposition(filename),
+      'X-Content-Type-Options': 'nosniff',
     });
     return new StreamableFile(body);
   }
+}
+
+function contentDisposition(filename: string): string {
+  const ascii = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }

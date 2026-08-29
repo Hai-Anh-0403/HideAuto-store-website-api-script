@@ -82,7 +82,7 @@ export default function OverviewPage() {
             </button>
             <button
               className="btn"
-              onClick={() => router.push('/portal/mini-apps/upload')}
+              onClick={() => router.push('/portal/mini-apps/new')}
               style={{ borderRadius: 10, padding: '10px 15px' }}
             >
               {t('overview.upload')}

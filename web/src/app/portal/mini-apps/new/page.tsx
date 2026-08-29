@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { TagPicker } from '@/components/TagPicker'
 import { useToast } from '@/components/Toast'
@@ -8,11 +8,21 @@ import { useI18n } from '@/i18n'
 import { api } from '@/lib/api'
 import { useErrorText } from '@/lib/errors'
 import { useTitle } from '@/lib/useTitle'
-import { GroupChips } from '@/components/Chips'
-import { Pill } from '@/components/Pill'
 import { RichTextEditor } from '@/components/RichTextEditor'
 import { VideoInput } from '@/components/VideoInput'
-import type { ScriptInspect } from '@/types'
+
+type UploadResponse = {
+  ok?: boolean
+  appId?: string
+  name?: string
+  version?: string
+  mode?: string
+  downloadUrl?: string
+  iconUrl?: string | null
+  fileSize?: number
+  checksumSha256?: string
+  scriptId?: string
+}
 
 const MAX_THUMBNAIL_SIZE = 1 * 1024 * 1024
 const MAX_IMAGE_SIZE = 3 * 1024 * 1024
@@ -47,71 +57,8 @@ async function uploadMedia(
   }
 }
 
-/* ────────────────── Pre-upload scan result ────────────────── */
-
-function InspectPreview({
-  inspect,
-  filename,
-}: {
-  inspect: ScriptInspect
-  filename: string
-}) {
-  const { t } = useI18n()
-
-  if (!inspect.graphExtracted) {
-    return (
-      <div className="banner warn" style={{ marginBottom: 12 }}>
-        <span className="bi">📦</span>
-        <div>
-          <b>{t('preview.opaqueTitle', { name: filename })}</b>
-          {t('preview.opaqueBody')}
-        </div>
-      </div>
-    )
-  }
-
-  const dirty = inspect.embeddedCredentialsCount > 0
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div className={dirty ? 'banner warn' : 'banner ok'}>
-        <span className="bi">{dirty ? '!' : '✓'}</span>
-        <div>
-          <b>
-            {t('preview.extracted', {
-              name: filename,
-              count: inspect.nodeCount,
-            })}
-          </b>
-          {dirty ? (
-            <div>
-              {t('preview.credentials', {
-                count: inspect.embeddedCredentialsCount,
-              })}
-              <div className="chips" style={{ marginTop: 6 }}>
-                {inspect.credentialPaths.map((p) => (
-                  <span key={p} className="keychip">🔑 {p}</span>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div>
-              {t('preview.clean', {
-                groups: inspect.nodeGroupsUsed.join(', ') || t('preview.noNodes'),
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {(inspect.nodeGroupsUsed.length > 0 || inspect.usesShell) && (
-        <div className="chips" style={{ marginTop: 8 }}>
-          <span className="note">{t('preview.needs')}:</span>
-          <GroupChips groups={inspect.nodeGroupsUsed} />
-          {inspect.usesShell && <Pill tone="bad">⚠ {t('cap.shell')}</Pill>}
-        </div>
-      )}
-    </div>
-  )
+function isHaupFile(file: File): boolean {
+  return file.name.toLowerCase().endsWith('.haup')
 }
 
 /* ────────────────── Thumbnail uploader ────────────────── */
@@ -254,11 +201,9 @@ export default function NewMiniAppPage() {
 
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // File + inspect
   const [file, setFile] = useState<File | null>(null)
-  const [inspect, setInspect] = useState<ScriptInspect | null>(null)
-  const [inspecting, setInspecting] = useState(false)
-  const [inspectError, setInspectError] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
 
   // Basic info
   const [name, setName] = useState('')
@@ -278,53 +223,81 @@ export default function NewMiniAppPage() {
 
   const [busy, setBusy] = useState(false)
 
-  const pickFile = async (f: File) => {
-    setFile(f)
-    setInspect(null)
-    setInspectError(null)
-    setInspecting(true)
-    try {
-      const form = new FormData()
-      form.append('file', f)
-      const result = await api.upload<ScriptInspect>('/scripts/inspect', form)
-      setInspect(result)
-      if (!name) setName(stripExtension(f.name))
-    } catch (err) {
-      setInspectError(errorText(err, 'upload.inspectFailed'))
-    } finally {
-      setInspecting(false)
+  const pickFile = (f: File) => {
+    if (!isHaupFile(f)) {
+      toast(t('upload.wrongType'))
+      return
     }
+    setFile(f)
+    setName((prev) => prev || stripExtension(f.name))
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
-    if (f) void pickFile(f)
+    if (f) pickFile(f)
+    e.target.value = ''
+  }
+
+  const onDragOver = (e: DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const onDragEnter = (e: DragEvent) => {
+    e.preventDefault()
+    setDragging(true)
+  }
+
+  const onDragLeave = (e: DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
+    setDragging(false)
+  }
+
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const f = e.dataTransfer.files[0]
+    if (f) pickFile(f)
   }
 
   const publish = async () => {
-    if (!file) return
+    if (!file) {
+      toast(t('upload.pick'))
+      return
+    }
     setBusy(true)
+    setProgress(0)
     try {
       const form = new FormData()
-      form.append('file', file)
-      form.append('name', name || file.name)
-      if (shortDesc) form.append('shortDescription', shortDesc)
-      if (description) form.append('description', description)
-      if (version) form.append('version', version)
-      if (changelog) form.append('changelog', changelog)
-      if (minApp) form.append('minAppVersion', minApp)
-      if (tagIds.length) form.append('tagIds', tagIds.join(','))
-      if (videoUrl) form.append('videoUrl', videoUrl)
-      if (thumbnailUrl) form.append('thumbnailUrl', thumbnailUrl)
-      if (images.length) form.append('images', images.join(','))
-
-      await api.upload('/scripts', form)
-      toast(t('upload.done', { name: name || file.name }))
-      router.push('/portal/mini-apps')
+      form.set('file', file)
+      form.set('name', name || file.name)
+      form.set('shortDescription', shortDesc)
+      form.set('description', description)
+      form.set('version', version)
+      form.set('changelog', changelog)
+      form.set('minAppVersion', minApp)
+      form.set('tagIds', tagIds.join(','))
+      form.set('videoUrl', videoUrl)
+      if (thumbnailUrl) form.set('thumbnailUrl', thumbnailUrl)
+      if (images.length) form.set('images', images.join(','))
+      const res = await api.uploadWithProgress<UploadResponse>(
+        '/apps/upload',
+        form,
+        setProgress,
+      )
+      const uploadedName = res.name || name || file.name
+      setFile(null)
+      toast(t('upload.done', { name: uploadedName }))
+      router.push(
+        res.scriptId
+          ? `/portal/mini-apps/${res.scriptId}`
+          : '/portal/mini-apps',
+      )
     } catch (err) {
       toast(errorText(err, 'upload.failed'))
     } finally {
       setBusy(false)
+      setProgress(null)
     }
   }
 
@@ -345,28 +318,34 @@ export default function NewMiniAppPage() {
         <div className="card-h"><h3>{t('newUpload.fileSection')}</h3></div>
         <div className="card-body" style={{ padding: '16px' }}>
           <div
-            className="dropzone"
+            className={`dropzone${dragging ? ' is-drag' : ''}`}
             style={{ cursor: 'pointer' }}
             onClick={() => fileRef.current?.click()}
+            onDragOver={onDragOver}
+            onDragEnter={onDragEnter}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
           >
-            <div>{file ? `✓ ${file.name} (${fmtSize(file.size)})` : t('upload.pick', { zip: '.zip', exe: '.exe' })}</div>
+            <div>{file ? `✓ ${file.name} (${fmtSize(file.size)})` : t('upload.pick')}</div>
             <input
               ref={fileRef}
               type="file"
-              accept=".zip,.exe"
+              accept=".haup,application/octet-stream"
               onChange={handleFileChange}
               style={{ display: 'none' }}
             />
           </div>
-
-          {inspecting && <div className="state" style={{ padding: '10px 0' }}>{t('upload.inspecting')}</div>}
-          {inspectError && (
-            <div className="banner bad" style={{ marginTop: 10 }}>
-              <span className="bi">!</span>
-              <div>{inspectError}</div>
+          {progress !== null && (
+            <div className="progress" style={{ marginTop: 12 }}>
+              <div
+                className="fill"
+                style={{
+                  width: `${progress}%`,
+                  background: 'var(--brand)',
+                }}
+              />
             </div>
           )}
-          {inspect && file && <div style={{ marginTop: 10 }}><InspectPreview inspect={inspect} filename={file.name} /></div>}
         </div>
       </div>
 

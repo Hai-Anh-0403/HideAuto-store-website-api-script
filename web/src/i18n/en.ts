@@ -152,8 +152,9 @@ export const en: Record<keyof typeof vi, string> = {
   'miniApps.ctx.copiedSlug': 'Slug copied',
 
   'upload.title': 'Upload a mini app',
-  'upload.pick': '⬆ Pick a mini app package — {zip} or {exe}',
+  'upload.pick': '⬆ Pick or drop a .haup package',
   'upload.inspecting': 'Reading and checking the workflow...',
+  'upload.wrongType': 'Only .haup packages are accepted.',
   'upload.name': 'Mini app name',
   'upload.namePlaceholder': 'Taken from the package',
   'upload.version': 'Version',
@@ -229,7 +230,7 @@ export const en: Record<keyof typeof vi, string> = {
   'detail.archivedBannerBody': 'Hidden and not downloadable.',
 
   'versions.uploadTitle': 'Upload a new version',
-  'versions.pick': '⬆ Pick a new package',
+  'versions.pick': '⬆ Pick or drop a new .haup package',
   'versions.changelog': 'Changes',
   'versions.submit': '⬆ Upload version',
   'versions.scanning': 'Checking...',
@@ -340,10 +341,11 @@ export const en: Record<keyof typeof vi, string> = {
   'packaging.col.status': 'Status',
   'packaging.builtBy.server': 'server template',
   'packaging.builtBy.agent': 'build agent',
+  'packaging.builtBy.upload': 'from .haup upload',
   'packaging.download': '⬇ Download app',
-  'packaging.empty': 'Not packaged yet. Click "Repackage".',
+  'packaging.empty': 'Not packaged yet. Upload a .haup or click "Repackage".',
   'packaging.foot':
-    'Only an approved version can be packaged. Changing the .exe name or icon needs a Windows build agent.',
+    'Upload builds download the unwrapped .exe via the public media URL. Repackage needs an approved version (Windows build agent to rename/re-icon the .exe).',
 
   'members.title': 'My users',
   'members.subtitle': 'Who redeemed a key, and what they unlocked.',
@@ -432,8 +434,8 @@ export const en: Record<keyof typeof vi, string> = {
   'profile.pw.foot': 'At least 8 characters. Every other device is signed out.',
 
   'newUpload.pageTitle': 'Upload a mini app',
-  'newUpload.pageSubtitle': 'Upload your mini app package, add images / video, and write a listing description.',
-  'newUpload.fileSection': 'Mini app package',
+  'newUpload.pageSubtitle': 'Upload a .haup package. Name, version and icon come from the file after unwrap.',
+  'newUpload.fileSection': 'Mini app package (.haup)',
   'newUpload.infoSection': 'Basic info',
   'newUpload.mediaSection': 'Images & video',
   'newUpload.descriptionSection': 'Full description',
@@ -446,15 +448,26 @@ export const en: Record<keyof typeof vi, string> = {
   'newUpload.galleryTitle': 'Screenshots',
   'newUpload.pickImages': '⬆ Add images — max {max} each',
   'newUpload.imageTooBig': '"{name}" exceeds {max} — skipped',
+  'newUpload.iconFromPackage': 'Icon from the package will be used as the cover unless you pick another image.',
   'newUpload.uploadFailed': 'Image upload failed',
 
   'tags.label': 'Tags',
   'tags.placeholder': 'Pick tags...',
 
   'errors.hideflow_encrypted':
-    '.hideflow files are encrypted, so the store cannot open them. Upload the mini-app package (.zip/.exe) or an app.workflow / graph .json file instead.',
+    '.hideflow files are encrypted, so the store cannot open them. Upload a .haup mini-app package instead.',
   'errors.unsupported_upload':
-    'Unsupported format. Expected a mini-app package (.zip/.exe) or an app.workflow / graph .json file.',
+    'Unsupported format. Expected a .haup mini-app package, a mini-app .zip/.exe, or an app.workflow / graph .json file.',
+  'errors.haup_not_unwrapped': 'HAUP2 containers must be unwrapped before the graph is extracted.',
+  'errors.wrapper_bad_magic': 'Wrong magic — not a valid mini-app file (need HAUP2).',
+  'errors.wrapper_decrypt_failed': 'Decrypt failed — the file is corrupt or the key is wrong.',
+  'errors.wrapper_key_missing': 'The server has no MINI_APP_WRAPPER_PRIVATE_KEY configured.',
+  'errors.wrapper_key_invalid': 'MINI_APP_WRAPPER_PRIVATE_KEY is not a valid X25519 PKCS8 key.',
+  'errors.wrapper_invalid': 'The .haup file is not a valid mini-app container.',
+  'errors.file_required': 'A file is required.',
+  'errors.invalid_mode': 'Mode is not valid (PUBLIC or LICENSE).',
+  'errors.app_id_taken': 'This mini app already belongs to another seller.',
+  'errors.upload_failed': 'Upload failed.',
   'errors.no_app_workflow': 'No resources/app.workflow inside the package — is this a mini app?',
   'errors.not_a_graph': 'The file does not contain a workflow graph (no nodes list).',
   'errors.invalid_json': 'The file is not valid JSON.',

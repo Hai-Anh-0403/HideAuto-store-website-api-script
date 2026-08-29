@@ -65,6 +65,20 @@ export class StorageService {
     return { ref, checksum, sizeBytes: data.length };
   }
 
+  /**
+   * Write bytes at an explicit key (overwrite). Used for unwrapped mini-app exe/icon
+   * so re-upload of the same appId+version replaces the same object, matching S3.
+   */
+  async saveAs(key: string, data: Buffer): Promise<StoredFile> {
+    const checksum = createHash('sha256').update(data).digest('hex');
+    const target = this.resolve(key.replace(/\\/g, '/'));
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    const tmp = `${target}.tmp`;
+    await fs.writeFile(tmp, data);
+    await fs.rename(tmp, target);
+    return { ref: key.replace(/\\/g, '/'), checksum, sizeBytes: data.length };
+  }
+
   /** Absolute path of a stored artifact — for streaming it back to the client. */
   pathFor(ref: string): string {
     return this.resolve(ref);

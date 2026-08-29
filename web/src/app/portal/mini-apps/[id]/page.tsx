@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useCallback, useRef, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Pager } from '@/components/Pager'
 import { Pill } from '@/components/Pill'
@@ -311,10 +311,17 @@ export default function MiniAppDetailPage() {
             })
           }
           onDownload={(build) =>
-            run(async () => {
+            void run(async () => {
+              // Always fetch→blob (same as key export). Navigating to a raw .exe URL
+              // is what Chrome blocks; blob: downloads are allowed.
+              const filename =
+                build.builtBy === 'upload'
+                  ? (build.fileUrl?.split('/').pop() ??
+                    `${s.slug}-${build.appVersion}-setup.exe`)
+                  : `${s.slug}-${build.appVersion}.zip`
               await api.download(
                 `/scripts/${s.id}/builds/${build.id}/download`,
-                `${s.slug}-${build.appVersion}.zip`,
+                filename,
               )
               return t('packaging.downloading')
             })
@@ -639,11 +646,43 @@ function DetailVersions({
   const errorText = useErrorText()
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [file, setFile] = useState<File | null>(null)
+  const [dragging, setDragging] = useState(false)
   const [version, setVersion] = useState(nextVersion(s.latestVersion))
   const [changelog, setChangelog] = useState('')
   const [minApp, setMinApp] = useState(s.minAppVersion ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
+
+  const pickVersionFile = (f: File) => {
+    if (!f.name.toLowerCase().endsWith('.haup')) {
+      toast(t('upload.wrongType'))
+      return
+    }
+    setFile(f)
+    setError(null)
+  }
+
+  const onDragOver = (e: DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+  const onDragEnter = (e: DragEvent) => {
+    e.preventDefault()
+    setDragging(true)
+  }
+
+  const onDragLeave = (e: DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
+    setDragging(false)
+  }
+
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const f = e.dataTransfer.files[0]
+    if (f) pickVersionFile(f)
+  }
 
   const toggle = (vid: string) =>
     setOpen((prev) => {
@@ -681,8 +720,24 @@ function DetailVersions({
       <div className="card">
         <div className="card-h"><h3>{t('versions.uploadTitle')}</h3></div>
         <form onSubmit={upload} style={{ padding: 16 }}>
-          <label className="dropzone" style={{ display: 'block', cursor: 'pointer', marginBottom: 12 }}>
-            <input type="file" accept=".zip,.exe" className="hide" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <label
+            className={`dropzone${dragging ? ' is-drag' : ''}`}
+            style={{ display: 'block', cursor: 'pointer', marginBottom: 12 }}
+            onDragOver={onDragOver}
+            onDragEnter={onDragEnter}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+          >
+            <input
+              type="file"
+              accept=".haup,application/octet-stream"
+              className="hide"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) pickVersionFile(f)
+                e.target.value = ''
+              }}
+            />
             {file ? (<>✓ <b>{file.name}</b></>) : t('versions.pick')}
           </label>
           {error != null && <div className="state bad">{errorText(error, 'upload.failed')}</div>}
@@ -985,7 +1040,7 @@ function DetailPackaging({
   loading: boolean
   error: string | null
   onBuild: (versionId: string) => void
-  /** The packaged .zip of one build — what a buyer would install. */
+  /** The packaged artifact of one build (upload = .exe via media URL; else .zip stream). */
   onDownload: (build: MiniAppBuild) => void
 }) {
   const { t } = useI18n()
@@ -1044,7 +1099,15 @@ function DetailPackaging({
                     <td>{b.platform} · <span className="mono">{b.arch}</span></td>
                     <td><span className="keychip">v{b.appVersion}</span></td>
                     <td className="opt">
-                      <Pill tone="neutral">{t(b.builtBy === 'server' ? 'packaging.builtBy.server' : 'packaging.builtBy.agent')}</Pill>
+                      <Pill tone="neutral">
+                        {t(
+                          b.builtBy === 'upload'
+                            ? 'packaging.builtBy.upload'
+                            : b.builtBy === 'server'
+                              ? 'packaging.builtBy.server'
+                              : 'packaging.builtBy.agent',
+                        )}
+                      </Pill>
                     </td>
                     <td className="tnum u-sub opt">{fmtBytes(b.sizeBytes)}</td>
                     <td>

@@ -159,6 +159,13 @@ export interface ScriptInspect {
   /** Locations of embedded secrets — paths only, never values. */
   credentialPaths: string[]
   usesShell: boolean
+  /** From the HAUP2 inner header (or the package envelope). */
+  name: string | null
+  version: string | null
+  appId: string | null
+  appName: string | null
+  hasIcon: boolean
+  iconDataUrl: string | null
 }
 
 /* ---------- Admin console ---------- */
@@ -286,7 +293,8 @@ export interface MiniAppBuild {
   checksum: string | null
   fileUrl: string | null
   status: BuildStatus
-  builtBy: 'server' | 'agent'
+  /** `upload` = exe unwrapped from `.haup`; `server`/`agent` = template repackage. */
+  builtBy: 'server' | 'agent' | 'upload'
   error: string | null
   builtAt: string | null
   createdAt: string

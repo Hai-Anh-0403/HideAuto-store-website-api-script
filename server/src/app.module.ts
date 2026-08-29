@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
 import { StorageModule } from './storage/storage.module';
 import { LicensingModule } from './licensing/licensing.module';
@@ -17,7 +18,14 @@ import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: [
+        join(__dirname, '..', '.env'),
+        join(process.cwd(), '.env'),
+        join(process.cwd(), 'server', '.env'),
+      ],
+    }),
     PrismaModule,
     StorageModule,
     LicensingModule,

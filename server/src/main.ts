@@ -25,6 +25,9 @@ async function bootstrap() {
     helmet({
       contentSecurityPolicy: false,
       crossOriginEmbedderPolicy: false,
+      // Public `/api/v1/media/…` (icons + unwrapped .exe) must be fetchable from the
+      // portal origin and from packaged mini apps — default CORP `same-origin` blocks that.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
 

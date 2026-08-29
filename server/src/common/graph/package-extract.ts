@@ -1,6 +1,9 @@
 /**
  * Pull the workflow graph out of an uploaded artifact.
  *
+ * `.haup` (HAUP2) is unwrapped in `mini-app-container.ts` *before* this runs — this
+ * module sees the inner exe/zip (or a raw `.zip` / `.exe` / graph JSON for older uploads).
+ *
  * Supported containers (see `docs/script-publish-packaging.md` §1.2):
  *
  * * **mini-app package** (`.zip`, or an `.exe` that is really a zip of the app folder) —
@@ -16,6 +19,7 @@
 
 import JSZip from 'jszip';
 import { UnprocessableError } from '../errors';
+import { looksLikeHaup2 } from './mini-app-container';
 import type { Json } from './workflow-graph';
 
 const APP_WORKFLOW_ENTRY = 'resources/app.workflow';
@@ -175,11 +179,18 @@ export async function extractPackage(
   content: Buffer,
   filename: string,
 ): Promise<ExtractedPackage> {
+  if (looksLikeHaup2(content)) {
+    fail(
+      'haup_not_unwrapped',
+      'HAUP2 containers must be unwrapped before the graph is extracted',
+    );
+  }
+
   if (content.subarray(0, HIDEFLOW_MAGIC.length).equals(HIDEFLOW_MAGIC)) {
     fail(
       'hideflow_encrypted',
-      'Encrypted .hideflow exports are not supported yet — upload the mini-app ' +
-        'package (.zip/.exe) instead',
+      'Encrypted .hideflow exports are not supported yet — upload a .haup mini-app ' +
+        'package instead',
     );
   }
 
@@ -230,7 +241,7 @@ export async function extractPackage(
 
   fail(
     'unsupported_upload',
-    'Unsupported upload — expected a mini-app package (.zip/.exe) or an app.workflow ' +
-      '/ graph .json file',
+    'Unsupported upload — expected a .haup mini-app package, a mini-app .zip/.exe, ' +
+      'or an app.workflow / graph .json file',
   );
 }

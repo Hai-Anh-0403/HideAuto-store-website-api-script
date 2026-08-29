@@ -150,8 +150,9 @@ export const vi = {
   'miniApps.ctx.copiedSlug': 'Đã chép slug',
 
   'upload.title': 'Tải mini app lên',
-  'upload.pick': '⬆ Chọn gói mini app — {zip} hoặc {exe}',
+  'upload.pick': '⬆ Chọn hoặc kéo thả gói .haup',
   'upload.inspecting': 'Đang đọc và kiểm tra workflow…',
+  'upload.wrongType': 'Chỉ nhận file .haup.',
   'upload.name': 'Tên mini app',
   'upload.namePlaceholder': 'Lấy theo tên trong gói',
   'upload.version': 'Phiên bản',
@@ -227,7 +228,7 @@ export const vi = {
   'detail.archivedBannerBody': 'Không hiển thị và không tải được.',
 
   'versions.uploadTitle': 'Tải phiên bản mới',
-  'versions.pick': '⬆ Chọn gói mới',
+  'versions.pick': '⬆ Chọn hoặc kéo thả gói .haup mới',
   'versions.changelog': 'Thay đổi',
   'versions.submit': '⬆ Tải phiên bản mới',
   'versions.scanning': 'Đang kiểm tra…',
@@ -339,10 +340,11 @@ export const vi = {
   'packaging.col.status': 'Trạng thái',
   'packaging.builtBy.server': 'Tự động trên store',
   'packaging.builtBy.agent': 'Máy đóng gói riêng',
+  'packaging.builtBy.upload': 'Từ file .haup',
   'packaging.download': '⬇ Tải app',
-  'packaging.empty': 'Chưa đóng gói. Bấm "Đóng gói lại".',
+  'packaging.empty': 'Chưa có gói. Tải .haup lên hoặc bấm "Đóng gói lại".',
   'packaging.foot':
-    'Chỉ đóng gói được phiên bản đã duyệt. Muốn đổi tên và icon của file .exe thì cần máy đóng gói Windows riêng.',
+    'Bản từ .haup tải thẳng exe đã giải mã qua URL media (public). Đóng gói lại cần version đã duyệt (đổi tên/icon .exe cần máy Windows riêng).',
 
   'members.title': 'Người dùng của tôi',
   'members.subtitle': 'Ai đã nhập khoá và đang dùng app nào.',
@@ -432,8 +434,8 @@ export const vi = {
   'profile.pw.foot': 'Mật khẩu mới ít nhất 8 ký tự. Đổi xong, mọi thiết bị khác bị đăng xuất.',
 
   'newUpload.pageTitle': 'Tải mini app lên',
-  'newUpload.pageSubtitle': 'Tải gói mini app lên, thêm ảnh / video, viết mô tả cho trang bán.',
-  'newUpload.fileSection': 'Gói mini app',
+  'newUpload.pageSubtitle': 'Tải gói .haup lên. Tên, phiên bản và icon lấy từ file sau khi giải mã.',
+  'newUpload.fileSection': 'Gói mini app (.haup)',
   'newUpload.infoSection': 'Thông tin cơ bản',
   'newUpload.mediaSection': 'Hình ảnh & video',
   'newUpload.descriptionSection': 'Mô tả chi tiết',
@@ -446,15 +448,26 @@ export const vi = {
   'newUpload.galleryTitle': 'Ảnh chụp màn hình',
   'newUpload.pickImages': '⬆ Thêm ảnh — mỗi ảnh tối đa {max}',
   'newUpload.imageTooBig': '"{name}" vượt quá {max} — bỏ qua',
+  'newUpload.iconFromPackage': 'Icon trong gói sẽ dùng làm ảnh bìa trừ khi bạn chọn ảnh khác.',
   'newUpload.uploadFailed': 'Tải ảnh thất bại',
 
   'tags.label': 'Tag',
   'tags.placeholder': 'Chọn tag…',
 
   'errors.hideflow_encrypted':
-    'File .hideflow được mã hoá nên store không mở được. Hãy tải lên gói mini app (.zip/.exe) hoặc file app.workflow / graph .json.',
+    'File .hideflow được mã hoá nên store không mở được. Hãy tải lên gói mini app .haup.',
   'errors.unsupported_upload':
-    'Định dạng không hỗ trợ. Cần gói mini app (.zip/.exe) hoặc file app.workflow / graph .json.',
+    'Định dạng không hỗ trợ. Cần gói mini app .haup, gói .zip/.exe, hoặc file app.workflow / graph .json.',
+  'errors.haup_not_unwrapped': 'File HAUP2 phải được giải mã trước khi tách graph.',
+  'errors.wrapper_bad_magic': 'Sai magic — không phải file mini-app hợp lệ (cần HAUP2).',
+  'errors.wrapper_decrypt_failed': 'Giải mã thất bại — file hỏng hoặc sai khoá.',
+  'errors.wrapper_key_missing': 'Server chưa cấu hình MINI_APP_WRAPPER_PRIVATE_KEY.',
+  'errors.wrapper_key_invalid': 'MINI_APP_WRAPPER_PRIVATE_KEY không phải khoá X25519 PKCS8 hợp lệ.',
+  'errors.wrapper_invalid': 'File .haup không phải container mini-app hợp lệ.',
+  'errors.file_required': 'Cần chọn một file.',
+  'errors.invalid_mode': 'Mode không hợp lệ (PUBLIC hoặc LICENSE).',
+  'errors.app_id_taken': 'Mini-app này thuộc seller khác.',
+  'errors.upload_failed': 'Upload lỗi.',
   'errors.no_app_workflow': 'Không thấy resources/app.workflow trong gói — đây có phải mini app?',
   'errors.not_a_graph': 'File không chứa workflow — không thấy danh sách node.',
   'errors.invalid_json': 'File không phải JSON hợp lệ.',

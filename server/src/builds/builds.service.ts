@@ -157,7 +157,7 @@ export class BuildsService {
     }
   }
 
-  /** The packaged archive for a build the seller owns. */
+  /** The packaged archive (or unwrapped exe for upload builds) for a build the seller owns. */
   async download(sellerId: string, buildId: string) {
     const build = await this.prisma.miniAppBuild.findFirst({
       where: { id: buildId, script: { sellerId } },
@@ -173,9 +173,18 @@ export class BuildsService {
       );
     }
 
+    const fromUpload = build.builtBy === 'upload';
+    const filename = fromUpload
+      ? (build.fileUrl.split('/').pop() ??
+        `${build.script.slug}-${build.appVersion}-setup.exe`)
+      : `${build.script.slug}-${build.appVersion}.zip`;
+
     return {
-      filename: `${build.script.slug}-${build.appVersion}.zip`,
+      filename,
       body: await this.storage.readBytes(build.fileUrl),
+      contentType: fromUpload
+        ? 'application/octet-stream'
+        : 'application/zip',
     };
   }
 }
