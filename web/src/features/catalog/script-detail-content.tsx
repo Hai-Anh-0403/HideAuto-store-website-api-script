@@ -140,6 +140,15 @@ export function ScriptDetailContent({
         </section>
 
         <aside className="purchase p-5 bg-[var(--panel)] border border-[var(--line)] h-fit">
+          <div className="price-box mb-4 pb-4 border-b border-[var(--line)] flex items-baseline justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--dim)]">
+              {t('common.startingPrice')}
+            </span>
+            <span className="font-heading font-bold text-3xl text-[var(--steel)]">
+              {script.price || '$29'}
+            </span>
+          </div>
+
           <p className="label font-mono text-[10px] uppercase tracking-widest text-[var(--dim)] mb-1">
             {t('home.automationDirectContact')}
           </p>
@@ -207,10 +216,26 @@ export function ScriptDetailContent({
           </div>
           <div className="p-4 border-r border-b border-[var(--line)]">
             <dt className="font-mono text-[9px] uppercase tracking-widest text-[var(--dim)]">
+              {t('common.startingPrice')}
+            </dt>
+            <dd className="font-heading font-semibold text-lg uppercase text-[var(--steel)] mt-1 m-0">
+              {script.price || '$29'}
+            </dd>
+          </div>
+          <div className="p-4 border-r border-b border-[var(--line)]">
+            <dt className="font-mono text-[9px] uppercase tracking-widest text-[var(--dim)]">
               {t('script.lastUpdatedLabel')}
             </dt>
             <dd className="font-heading font-semibold text-lg uppercase text-[var(--ink)] mt-1 m-0" suppressHydrationWarning>
               {new Date(script.updatedAt).toLocaleDateString()}
+            </dd>
+          </div>
+          <div className="p-4 border-r border-b border-[var(--line)]">
+            <dt className="font-mono text-[9px] uppercase tracking-widest text-[var(--dim)]">
+              {t('seller.views')}
+            </dt>
+            <dd className="font-heading font-semibold text-lg uppercase text-[var(--ink)] mt-1 m-0">
+              {script.statistics.views.toLocaleString()}
             </dd>
           </div>
           <div className="p-4 border-r border-b border-[var(--line)]">

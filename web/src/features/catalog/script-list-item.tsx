@@ -1,12 +1,15 @@
 'use client';
 
+import React, { memo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Eye, Star } from 'lucide-react';
 import type { PublicScriptSummary } from '@/types';
 import type { CatalogScript } from './data';
 
-export function ScriptListItem({
+const viewFormatter = new Intl.NumberFormat('en-US');
+
+export const ScriptListItem = memo(function ScriptListItem({
   script,
   priority = false,
 }: {
@@ -21,6 +24,7 @@ export function ScriptListItem({
   const views = isPublic ? script.statistics.views : script.views
   const description = isPublic ? script.shortDescription : script.outcome
   const tags = isPublic ? script.tags.map((tag) => tag.name).join(' · ') : script.platform
+  const price = ('price' in script && script.price) ? script.price : '$29'
   return (
     <article className="script-list-item group transition-all duration-200">
       <div className="script-list-link grid grid-cols-[100px_minmax(0,1fr)] sm:grid-cols-[120px_minmax(0,1fr)] gap-3 sm:gap-4 p-3 bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--steel)] transition-colors">
@@ -35,6 +39,7 @@ export function ScriptListItem({
             width={120}
             height={120}
             priority={priority}
+            loading={priority ? undefined : 'lazy'}
             sizes="(max-width: 760px) 100px, 120px"
             className="w-full h-full object-cover filter saturate-75 contrast-105 group-hover:scale-105 transition-transform duration-300"
           />
@@ -49,7 +54,7 @@ export function ScriptListItem({
             </h3>
             <p className="script-seller text-xs text-[var(--muted)] flex items-center gap-1.5 my-0.5 truncate">
               <Link
-                href="/developers"
+                href="/sellers"
                 className="hover:underline hover:text-[var(--steel)] font-medium"
               >
                 {seller}
@@ -61,7 +66,7 @@ export function ScriptListItem({
                 <Star size={11} fill="currentColor" className="text-[var(--steel)]" /> {rating}
               </span>
               <span className="inline-flex items-center gap-1">
-                <Eye size={11} /> {new Intl.NumberFormat('en-US').format(views)}
+                <Eye size={11} /> {viewFormatter.format(views)}
               </span>
             </p>
             <p className="script-outcome text-xs text-[var(--muted)] line-clamp-2 my-1 leading-normal">
@@ -73,11 +78,11 @@ export function ScriptListItem({
               {tags}
             </small>
             <strong className="font-heading font-bold text-sm sm:text-base text-[var(--ink)] whitespace-nowrap">
-              {isPublic ? `v${version}` : script.price}
+              {price}
             </strong>
           </div>
         </div>
       </div>
     </article>
   );
-}
+});

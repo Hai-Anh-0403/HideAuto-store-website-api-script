@@ -8,6 +8,8 @@ export const PUBLIC_SCRIPT_SORTS = [
   'newest',
   'updated',
   'views',
+  'price_asc',
+  'price_desc',
 ] as const;
 
 export type PublicScriptSort = (typeof PUBLIC_SCRIPT_SORTS)[number];

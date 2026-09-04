@@ -68,6 +68,8 @@ export const en = {
     'Search task, seller, platform, or social platform',
   'catalog.search': 'Search',
   'catalog.filters': 'Filters',
+  'catalog.all': 'All',
+  'catalog.categories': 'Categories',
   'catalog.status': 'Status',
   'catalog.socialPlatforms': 'Platforms',
   'catalog.clearAll': 'Clear all',
@@ -79,6 +81,8 @@ export const en = {
   'catalog.newest': 'Newest',
   'catalog.mostWatched': 'Most watched',
   'catalog.recentlyUpdated': 'Recently updated',
+  'catalog.priceAsc': 'Price: Low to High',
+  'catalog.priceDesc': 'Price: High to Low',
   'catalog.searchChip': 'Search: {value}',
   'catalog.noMatchTitle': 'No scripts match this search.',
   'catalog.noMatchDescription':

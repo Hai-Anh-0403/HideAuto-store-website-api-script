@@ -9,11 +9,18 @@ export function BackToTop() {
   const { t } = useI18n();
 
   useEffect(() => {
-    const updateVisibility = () => setIsVisible(window.scrollY > 320);
-    updateVisibility();
+    let handle = 0;
+    const updateVisibility = () => {
+      handle = window.requestAnimationFrame(() => {
+        setIsVisible(window.scrollY > 320);
+      });
+    };
     window.addEventListener('scroll', updateVisibility, { passive: true });
 
-    return () => window.removeEventListener('scroll', updateVisibility);
+    return () => {
+      window.removeEventListener('scroll', updateVisibility);
+      if (handle) window.cancelAnimationFrame(handle);
+    };
   }, []);
 
   const scrollToTop = () => {

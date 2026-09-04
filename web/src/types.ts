@@ -36,6 +36,9 @@ export interface PublicScriptSummary {
   name: string
   shortDescription: string
   thumbnailUrl: string | null
+  price: string
+  priceAmount?: number
+  currency?: string
   seller: { displayName: string }
   tags: PublicTag[]
   latestApprovedVersion: string

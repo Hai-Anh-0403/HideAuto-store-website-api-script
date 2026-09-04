@@ -17,14 +17,19 @@ interface RichTextEditorProps {
   placeholder?: string
 }
 
-DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-  if (node.tagName === 'A') {
-    node.setAttribute('target', '_blank')
-    node.setAttribute('rel', 'noopener noreferrer')
-  }
-})
+let isHookAdded = false
 
 function sanitize(html: string): string {
+  if (typeof window === 'undefined') return html
+  if (!isHookAdded && typeof DOMPurify?.addHook === 'function') {
+    DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+      if (node.tagName === 'A') {
+        node.setAttribute('target', '_blank')
+        node.setAttribute('rel', 'noopener noreferrer')
+      }
+    })
+    isHookAdded = true
+  }
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
       'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's',

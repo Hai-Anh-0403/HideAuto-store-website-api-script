@@ -55,6 +55,15 @@ export class PublicScriptSummaryDto {
   @ApiProperty()
   latestApprovedVersion!: string;
 
+  @ApiProperty({ example: '$29' })
+  price!: string;
+
+  @ApiProperty({ example: 29 })
+  priceAmount!: number;
+
+  @ApiProperty({ example: 'USD' })
+  currency!: string;
+
   @ApiProperty({ type: () => PublicScriptStatisticsDto })
   statistics!: PublicScriptStatisticsDto;
 

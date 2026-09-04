@@ -24,10 +24,10 @@ export function DeveloperDetailContent({
   return (
     <main className="shell section developer-page py-8 md:py-12">
       <div className="back-button-wrapper mb-4">
-        <BackButton fallbackHref="/developers" />
+        <BackButton fallbackHref="/sellers" />
       </div>
       <p className="label font-mono text-[10px] uppercase tracking-widest text-[var(--dim)] mb-4">
-        <Link href="/developers" className="hover:text-[var(--steel)]">{t('seller.sellersLabel')}</Link> /{' '}
+        <Link href="/sellers" className="hover:text-[var(--steel)]">{t('seller.sellersLabel')}</Link> /{' '}
         {developer.name.toUpperCase()}
       </p>
       <div className="developer-profile max-w-3xl pb-8 mb-8 border-b border-[var(--line)]">

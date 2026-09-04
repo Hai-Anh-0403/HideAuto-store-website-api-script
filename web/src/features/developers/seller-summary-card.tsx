@@ -25,7 +25,7 @@ export function SellerSummaryCard({ seller }: { seller: Developer }) {
             {seller.reviewCount})
           </p>
           <h3 className="font-heading font-semibold text-xl uppercase leading-tight text-[var(--ink)] my-1">
-            <Link href={`/developers/${seller.slug}`} className="hover:text-[var(--steel)] transition-colors">
+            <Link href={`/sellers/${seller.slug}`} className="hover:text-[var(--steel)] transition-colors">
               {seller.name}
             </Link>
             {seller.verified && (
@@ -50,7 +50,7 @@ export function SellerSummaryCard({ seller }: { seller: Developer }) {
           </div>
           <Link
             className="seller-summary-card__link inline-flex items-center gap-1.5 mt-3 text-[var(--steel)] font-heading font-semibold text-sm hover:translate-x-1 transition-transform"
-            href={`/developers/${seller.slug}`}
+            href={`/sellers/${seller.slug}`}
           >
             {t('seller.viewProfile')} <ArrowRight size={15} />
           </Link>

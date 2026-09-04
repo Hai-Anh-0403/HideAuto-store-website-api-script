@@ -81,4 +81,20 @@ export class CreateScriptDto {
   @IsString()
   @MaxLength(1000)
   tagIds?: string;
+
+  @ApiPropertyOptional({ example: '$29', description: 'Display price string' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  price?: string;
+
+  @ApiPropertyOptional({ example: 29, description: 'Numeric price amount' })
+  @IsOptional()
+  priceAmount?: number;
+
+  @ApiPropertyOptional({ example: 'USD', description: 'Currency code (default USD)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  currency?: string;
 }

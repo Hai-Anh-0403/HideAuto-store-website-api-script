@@ -13,6 +13,7 @@ export interface CatalogScriptSeed {
   views: number;
   watches: number;
   image: string;
+  currency?: string;
 }
 
 export const scripts: CatalogScriptSeed[] = [

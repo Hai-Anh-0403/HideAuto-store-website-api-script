@@ -22,4 +22,10 @@ export class StoreController {
   async findOne(@Param('slugOrId') slugOrId: string) {
     return this.storeService.findPublicBySlugOrId(slugOrId);
   }
+
+  @Get('tags')
+  @ApiOperation({ summary: 'List public store tags' })
+  async tags() {
+    return this.storeService.publicTags();
+  }
 }

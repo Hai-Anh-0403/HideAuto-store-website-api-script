@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import React, { createContext, useContext, useCallback, useEffect, useState, useMemo } from 'react'
 import { en } from './en'
 import { vi } from './vi'
 import { en as storefrontEn } from '@/shared/i18n/messages/en'
@@ -10,81 +10,120 @@ const dicts = {
   en: { ...en, ...storefrontEn },
   vi: { ...vi, ...storefrontVi },
 } as const
-type Locale = keyof typeof dicts
-type Key = keyof typeof dicts.vi
 
-const DEFAULT_LOCALE: Locale = 'vi'
+export type Locale = keyof typeof dicts
+export type MessageKey = keyof typeof dicts.vi
 
-/**
- * Starts at the default on both sides of the wire.
- *
- * Reading localStorage here instead would make the module's value differ between the
- * server render and the first client render, and React answers a mismatch by throwing
- * the server HTML away and re-rendering the whole tree (hydration error #418). The
- * stored choice is applied just after mount, which costs one extra render instead.
- */
-let currentLocale: Locale = DEFAULT_LOCALE
-let storedLocaleApplied = false
-const listeners = new Set<() => void>()
+export const DEFAULT_LOCALE: Locale = 'vi'
 
-/** Adopt the visitor's saved locale. Safe to call from every mount; only the first acts. */
-function applyStoredLocale(): void {
-  if (storedLocaleApplied || typeof window === 'undefined') return
-  storedLocaleApplied = true
-
-  // Defer to macrotask so the initial React hydration pass completes consistently
-  // with DEFAULT_LOCALE across all components before any stored preference is applied.
-  setTimeout(() => {
-    try {
-      const stored = localStorage.getItem('locale')
-      if (stored && stored !== currentLocale && stored in dicts) {
-        currentLocale = stored as Locale
-        listeners.forEach((fn) => fn())
-      }
-    } catch {
-      // Ignore errors when localStorage is disabled or restricted
-    }
-  }, 0)
+interface I18nContextValue {
+  locale: Locale
+  setLocale: (loc: Locale) => void
+  t: (key: string, vars?: Record<string, string | number>) => string
+  tryT: (key: string, fallback: string) => string
 }
 
-export type MessageKey = Key
+const I18nContext = createContext<I18nContextValue | null>(null)
 
-export function useI18n() {
-  const [, setTick] = useState(0)
-  const forceUpdate = useCallback(() => setTick((n) => n + 1), [])
+export function I18nProvider({
+  children,
+  initialLocale = DEFAULT_LOCALE,
+}: {
+  children: React.ReactNode
+  initialLocale?: Locale
+}) {
+  const [locale, setLocaleState] = useState<Locale>(initialLocale)
 
   useEffect(() => {
-    listeners.add(forceUpdate)
-    applyStoredLocale()
-    return () => {
-      listeners.delete(forceUpdate)
-    }
-  }, [forceUpdate])
+    const timer = setTimeout(() => {
+      try {
+        const stored = localStorage.getItem('locale') as Locale | null
+        if (stored && (stored === 'en' || stored === 'vi') && stored !== locale) {
+          setLocaleState(stored)
+          document.cookie = `locale=${stored}; path=/; max-age=31536000; SameSite=Lax`
+          document.documentElement.lang = stored
+        }
+      } catch {
+        // Ignore errors when localStorage is unavailable
+      }
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [locale])
 
-  const t = useCallback((key: string, vars?: Record<string, string | number>) => {
-    let text = dicts[currentLocale][key as Key] ?? key
+  const setLocale = useCallback((loc: Locale) => {
+    setLocaleState(loc)
+    try {
+      localStorage.setItem('locale', loc)
+      document.cookie = `locale=${loc}; path=/; max-age=31536000; SameSite=Lax`
+      document.documentElement.lang = loc
+    } catch {
+      // Ignore errors when localStorage is unavailable
+    }
+  }, [])
+
+  const t = useCallback(
+    (key: string, vars?: Record<string, string | number>) => {
+      let text = dicts[locale][key as MessageKey] ?? key
+      if (vars) {
+        for (const [k, v] of Object.entries(vars)) {
+          text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
+        }
+      }
+      return text
+    },
+    [locale],
+  )
+
+  const tryT = useCallback(
+    (key: string, fallback: string) => {
+      const found = dicts[locale][key as MessageKey]
+      return found ?? fallback
+    },
+    [locale],
+  )
+
+  const value = useMemo(
+    () => ({ locale, setLocale, t, tryT }),
+    [locale, setLocale, t, tryT],
+  )
+
+  return React.createElement(I18nContext.Provider, { value }, children)
+}
+
+export function useI18n() {
+  const ctx = useContext(I18nContext)
+  if (ctx) {
+    return {
+      t: ctx.t,
+      tryT: ctx.tryT,
+      locale: ctx.locale,
+      lang: ctx.locale,
+      setLang: ctx.setLocale,
+      setLocale: ctx.setLocale,
+    }
+  }
+
+  // Fallback if accessed outside provider
+  const fallbackT = (key: string, vars?: Record<string, string | number>) => {
+    let text = dicts[DEFAULT_LOCALE][key as MessageKey] ?? key
     if (vars) {
       for (const [k, v] of Object.entries(vars)) {
         text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
       }
     }
     return text
-  }, [])
+  }
 
-  const tryT = useCallback((key: string, fallback: string) => {
-    const found = dicts[currentLocale][key as Key]
-    return found ?? fallback
-  }, [])
+  const fallbackTryT = (key: string, fallback: string) => {
+    return dicts[DEFAULT_LOCALE][key as MessageKey] ?? fallback
+  }
 
-  const setLocale = useCallback((loc: Locale) => {
-    currentLocale = loc
-    try {
-      localStorage.setItem('locale', loc)
-    } catch {
-      // Ignore errors when localStorage is restricted
-    }
-    listeners.forEach((fn) => fn())
-  }, [])
-
-  return { t, tryT, locale: currentLocale, lang: currentLocale, setLang: setLocale, setLocale }
+  return {
+    t: fallbackT,
+    tryT: fallbackTryT,
+    locale: DEFAULT_LOCALE,
+    lang: DEFAULT_LOCALE,
+    setLang: () => {},
+    setLocale: () => {},
+  }
 }

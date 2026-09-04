@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check } from 'lucide-react';
 import Link from 'next/link';
 import { AdSlot } from '@/features/advertising';
@@ -31,6 +32,45 @@ const deliverySteps = [
   },
 ];
 
+function ScriptRailCards({
+  sort,
+}: {
+  sort: 'views' | 'newest' | 'popular' | 'updated';
+}) {
+  const { t } = useI18n();
+  const result = useFetch(
+    () => api.get<Page<PublicScriptSummary>>(`/store/scripts?sort=${sort}&limit=6`),
+    `rail-${sort}`,
+  );
+  const items = result.data?.items ?? [];
+
+  if (result.loading) {
+    return (
+      <div className="script-list-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <ScriptListItemSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <p className="col-span-full text-xs font-mono text-[var(--dim)] py-6">
+        {t('catalog.noMatchDescription')}
+      </p>
+    );
+  }
+
+  return (
+    <div className="script-list-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      {items.map((script) => (
+        <ScriptListItem key={script.id} script={script} />
+      ))}
+    </div>
+  );
+}
+
 function ScriptRail({
   label,
   titleKey,
@@ -41,15 +81,26 @@ function ScriptRail({
   sort: 'views' | 'newest' | 'popular' | 'updated';
 }) {
   const { t } = useI18n();
-  const result = useFetch(
-    () => api.get<Page<PublicScriptSummary>>(`/store/scripts?sort=${sort}&limit=6`),
-    `rail-${sort}`,
-  );
+  const [inView, setInView] = useState(false);
+  const railRef = useRef<HTMLElement>(null);
 
-  const items = result.data?.items ?? [];
+  useEffect(() => {
+    if (inView || !railRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '250px' },
+    );
+    observer.observe(railRef.current);
+    return () => observer.disconnect();
+  }, [inView]);
 
   return (
-    <section className="shell section script-rail py-10 md:py-14">
+    <section ref={railRef} className="shell section script-rail py-10 md:py-14">
       <div className="heading flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 md:mb-8 pb-3 border-b border-[var(--line)]">
         <div>
           <p className="label font-mono text-[10px] uppercase tracking-widest text-[var(--dim)] mb-1">
@@ -66,20 +117,51 @@ function ScriptRail({
           {t('common.viewAll')} <ArrowRight size={15} />
         </Link>
       </div>
-      <div className="script-list-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {result.loading ? (
-          Array.from({ length: 3 }).map((_, i) => <ScriptListItemSkeleton key={i} />)
-        ) : items.length > 0 ? (
-          items.map((script) => (
-            <ScriptListItem key={script.id} script={script} />
-          ))
-        ) : (
-          <p className="col-span-full text-xs font-mono text-[var(--dim)] py-6">
-            {t('catalog.noMatchDescription')}
-          </p>
-        )}
-      </div>
+      {inView ? (
+        <ScriptRailCards sort={sort} />
+      ) : (
+        <div className="script-list-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 min-h-[160px]">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <ScriptListItemSkeleton key={i} />
+          ))}
+        </div>
+      )}
     </section>
+  );
+}
+
+function LazyScriptGrid({ items, loading }: { items: PublicScriptSummary[]; loading: boolean }) {
+  const { t } = useI18n();
+  const [inView, setInView] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (inView || !gridRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '250px' },
+    );
+    observer.observe(gridRef.current);
+    return () => observer.disconnect();
+  }, [inView]);
+
+  return (
+    <div ref={gridRef} className="script-list-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 min-h-[160px]">
+      {!inView || loading ? (
+        Array.from({ length: 3 }).map((_, i) => <ScriptListItemSkeleton key={i} />)
+      ) : items.length ? (
+        items.map((script) => <ScriptListItem key={script.id} script={script} />)
+      ) : (
+        <p className="col-span-full text-xs font-mono text-[var(--dim)] py-6">
+          {t('catalog.noMatchDescription')}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -132,13 +214,13 @@ export default function Page() {
                 {t('home.featuredScripts')}
               </p>
               {heroFeatured.loading ? (
-                Array.from({ length: 2 }).map((_, i) => <ScriptListItemSkeleton key={i} />)
+                Array.from({ length: 4 }).map((_, i) => <ScriptListItemSkeleton key={i} />)
               ) : heroFeatured.data?.items.length ? (
                 heroFeatured.data.items.slice(0, 4).map((script, index) => (
                   <ScriptListItem
                     key={script.id}
                     script={script}
-                    priority={index < 2}
+                    priority={index === 0}
                   />
                 ))
               ) : (
@@ -178,22 +260,10 @@ export default function Page() {
               {t('home.viewAllHideAutoScripts')} <ArrowRight size={15} />
             </Link>
           </div>
-          <div className="script-list-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {heroFeatured.loading ? (
-              Array.from({ length: 3 }).map((_, i) => <ScriptListItemSkeleton key={i} />)
-            ) : heroFeatured.data?.items.length ? (
-              heroFeatured.data.items.map((script) => (
-                <ScriptListItem key={script.id} script={script} />
-              ))
-            ) : (
-              <p className="col-span-full text-xs font-mono text-[var(--dim)] py-6">
-                {t('catalog.noMatchDescription')}
-              </p>
-            )}
-          </div>
+          <LazyScriptGrid items={heroFeatured.data?.items ?? []} loading={heroFeatured.loading} />
         </section>
 
-        <section className="shell section py-10 md:py-14" id="developers">
+        <section className="shell section py-10 md:py-14" id="sellers">
           <div className="heading flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 md:mb-8 pb-3 border-b border-[var(--line)]">
             <div>
               <p className="label font-mono text-[10px] uppercase tracking-widest text-[var(--dim)] mb-1">
@@ -204,7 +274,7 @@ export default function Page() {
               </h2>
             </div>
             <Link
-              href="/developers"
+              href="/sellers"
               className="inline-flex items-center gap-1.5 font-heading font-semibold text-sm text-[var(--steel)] hover:translate-x-1 transition-transform"
             >
               {t('seller.viewAll')} <ArrowRight size={15} />
@@ -248,4 +318,3 @@ export default function Page() {
     </>
   );
 }
-

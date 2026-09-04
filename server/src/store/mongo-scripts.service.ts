@@ -21,6 +21,12 @@ export class MongoScriptsService {
   async create(sellerId: string, dto: CreateScriptDto) {
     const slug = await this.uniqueSlug(dto.name);
     const tagIds = this.parseTagIds(dto.tagIds);
+    const price = dto.price?.trim() || '$29';
+    const priceAmount = typeof dto.priceAmount === 'number'
+      ? dto.priceAmount
+      : (parseFloat(price.replace(/[^0-9.]/g, '')) || 29);
+    const currency = dto.currency?.trim() || 'USD';
+
     const script = await this.scripts.create({
       sellerId,
       slug,
@@ -28,6 +34,9 @@ export class MongoScriptsService {
       shortDescription: dto.shortDescription ?? '',
       descriptionHtml: dto.description ?? null,
       tagIds,
+      price,
+      priceAmount,
+      currency,
       status: 'DRAFT',
     });
     const version = await this.versions.create({

@@ -29,6 +29,7 @@ function ContactContent() {
     ? {
         name: scriptResult.data.name,
         seller: scriptResult.data.seller.displayName,
+        price: scriptResult.data.price,
       }
     : scriptSlug
     ? {

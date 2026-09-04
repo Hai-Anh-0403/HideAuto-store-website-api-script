@@ -38,6 +38,15 @@ const config: NextConfig = {
       },
     ]
   },
+  async redirects() {
+    return [
+      {
+        source: '/developers/:path*',
+        destination: '/sellers/:path*',
+        permanent: true,
+      },
+    ]
+  },
   async rewrites() {
     return [{ source: '/api/:path*', destination: `${apiOrigin}/api/:path*` }]
   },

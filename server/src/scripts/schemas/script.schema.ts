@@ -61,6 +61,15 @@ export class Script {
 
   @Prop({ type: Number, default: 0, min: 0 })
   views!: number;
+
+  @Prop({ type: String, default: '$29', trim: true })
+  price!: string;
+
+  @Prop({ type: Number, default: 29, min: 0 })
+  priceAmount!: number;
+
+  @Prop({ type: String, default: 'USD', trim: true })
+  currency!: string;
 }
 
 export const ScriptSchema = SchemaFactory.createForClass(Script);
@@ -69,3 +78,4 @@ ScriptSchema.index({ slug: 1 }, { unique: true });
 ScriptSchema.index({ status: 1, publishedAt: -1 });
 ScriptSchema.index({ sellerId: 1, updatedAt: -1 });
 ScriptSchema.index({ tagIds: 1, status: 1, publishedAt: -1 });
+ScriptSchema.index({ status: 1, priceAmount: 1, publishedAt: -1 });

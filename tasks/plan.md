@@ -1,381 +1,208 @@
-# Implementation Plan: MongoDB-backed Script Store APIs
+# Implementation Plan: Public sellers API for home section 07
 
 ## Overview
 
-Move marketplace-domain persistence to local MongoDB while retaining MySQL/Prisma for
-identity and authentication. The first deliverable is a public script catalog API consumed
-by `web`, then seller and admin script lifecycle APIs. This plan intentionally does not
-change the upload security pipeline: original uploads are never persisted, and only
-scrubbed graph references and derived metadata may be stored.
+Replace the mock `developers` data used by home section `07 / Community` with a public, anonymous API that returns approved sellers who currently have published scripts. The response must contain only marketplace-safe profile and aggregate statistics; seller credentials, email, contact details, sessions, and membership data must never be exposed.
 
-## Scope and ownership
+## Existing context
 
-| System | Owns | Does not own |
-| --- | --- | --- |
-| MySQL / Prisma | admins, sellers, seller sessions, passwords, JWT identity | script listings, versions, tags, keys, members, builds |
-| MongoDB | scripts, versions, tags, keys, members, redemptions, devices, builds | passwords, seller/admin sessions, JWT credentials |
-| Filesystem storage | scrubbed graph files, media, build artifacts | business metadata and access state |
+- The home page currently renders `developers.slice(0, 3)` from `web/src/features/developers/model.ts`.
+- Public catalog data is MongoDB-backed (`scripts` and `script_versions`), while seller identity is stored in MySQL (`sellers`). `StoreService.browsePublic()` already bridges these stores through `sellerId`.
+- A seller currently has no public profile slug, avatar, headline, or seller-level review model. The API must therefore not invent or promise those fields.
 
-MongoDB documents reference MySQL identities with immutable string IDs such as `sellerId`.
-No MongoDB collection may duplicate passwords, session tokens, or a second source of truth
-for a seller account.
+## Swagger audit — `http://localhost:3001/docs` (verified 2026-09-04)
 
-## API contract decisions
+- The existing **Sellers** tag is a private seller-portal surface only: `GET/PATCH /api/v1/sellers/me`, session management, password change, and seller overview stats all require a bearer token. It must not be reused by the anonymous storefront.
+- `GET /api/v1/admin/sellers` is also bearer-protected and exposes moderation data; it must not be used by section 07.
+- The anonymous store contract already lives under the **Store** tag: `GET /api/v1/store/scripts` and `GET /api/v1/store/tags`. Its pagination convention is `skip` (minimum `0`) and `limit` (minimum `1`, maximum `100`, default `20`).
+- No `GET /api/v1/store/sellers` endpoint exists in the live OpenAPI document. This confirms a public seller-list endpoint is the missing API slice, rather than a frontend integration task against an existing endpoint.
 
-- Preserve the existing `/api/v1` prefix and `{ detail, code }` error envelope.
-- Public catalog routes are read-only and return only `PUBLISHED` scripts.
-- All list endpoints use `skip` and `limit`; supported sort values are explicitly whitelisted.
-- Query parameters and request bodies use camelCase.
-- DTOs are defined before controllers and validated at the NestJS boundary.
-- API response DTOs are added to `web/src/types.ts` before frontend mock data is replaced.
+## API contract
+
+`GET /api/v1/store/sellers?skip=0&limit=3&sort=popular`
+
+- Authentication: none.
+- Eligible sellers: MySQL seller status is `APPROVED` and they own at least one MongoDB script with status `PUBLISHED`.
+- Response: existing page envelope `{ items, total, skip, limit }`.
+- Stable item shape:
+
+```json
+{
+  "id": "seller-cuid",
+  "name": "Automation Store",
+  "joinedAt": "2026-01-18T09:30:00.000Z",
+  "statistics": {
+    "publishedScripts": 3,
+    "downloads": 124,
+    "views": 2160,
+    "ratingAvg": 4.8,
+    "ratingCount": 42
+  }
+}
+```
+
+- Supported initial sort: `popular` (default): downloads descending, then views descending, then seller ID ascending for deterministic results.
+- Invalid pagination or sort uses the existing validation/error filter semantics.
+- Do not expose: `email`, `contact`, `password`, seller status/reason, membership/key/session/device data, or unapproved/no-listing sellers.
+
+## Architecture decisions
+
+- Add the endpoint to the existing public `StoreController`; do not repurpose the authenticated `/api/v1/sellers` portal controller.
+- Aggregate published-script statistics in MongoDB first, then hydrate the small page of seller IDs from MySQL in one `findMany` query. This follows the existing public-catalog boundary and avoids an N+1 query.
+- Treat a seller as marketplace-visible only if both sources agree: Mongo exposes published work and MySQL says `APPROVED`.
+- Reuse `PageDto` and the `skip`/`limit` naming already used by `/api/v1/store/scripts`; do not introduce a second pagination envelope.
+- Add `@ApiOperation` and `@ApiOkResponse` so `GET /api/v1/store/sellers` appears under Swagger's **Store** tag without a bearer-security requirement.
+- Keep this slice to list data for section 07. Seller profile/detail APIs, images, bios, reviews, and public contact actions require a separate product and schema decision.
 
 ## Dependency graph
 
 ```text
-Mongo connection and environment
-          |
-Mongo schemas and repository boundaries
-          |
-Script public DTOs and service queries
-          |
-Public catalog/detail controllers
-          |
-Frontend types and API client
-          |
-Catalog and detail pages without mock data
-          |
-Seller lifecycle, moderation, keys, members, builds
+Public seller contract + query DTO
+        |
+Mongo aggregation of published script statistics
+        |
+MySQL approved-seller hydration and deterministic page response
+        |
+Controller + Swagger contract + focused service tests
+        |
+Web types + home section 07 data fetch + loading/empty/error state
 ```
 
 ## Task list
 
-### Phase 0: Contract and foundation
+### Phase 1: Contract and backend vertical slice
 
-#### Task 1: Approve database ownership and public API contract
+## Task 1: Define the public seller-list contract
 
-**Description:** Record the MySQL/MongoDB boundary and the exact catalog/detail response
-shapes before editing persistence code.
+**Description:** Add a DTO for `skip`, `limit`, and the initial `popular` sort. Add explicit public response DTO/types for the safe seller summary and its statistics.
 
 **Acceptance criteria:**
 
-- [x] MySQL ownership is limited to accounts, roles, passwords, and sessions.
-- [x] MongoDB ownership is documented for every marketplace collection.
-- [x] `GET /api/v1/store/scripts` and `GET /api/v1/store/scripts/:slug` request/response
-  contracts are approved.
+- [ ] `GET /api/v1/store/sellers` is documented as anonymous and paginated.
+- [ ] Swagger lists the endpoint under **Store**, with no lock icon/bearer requirement; the existing **Sellers** and **Admin** routes remain unchanged.
+- [ ] Query validation caps `limit` using the project pagination convention and rejects unsupported sort values.
+- [ ] The response contract contains no internal or contact fields.
 
 **Verification:**
 
-- [ ] Team review confirms no field has two writable sources of truth.
-- [ ] Public response excludes graph content, credential scan paths, seller email, and storage paths.
+- [ ] Focused DTO test covers defaults, valid query values, and invalid sort/pagination.
+- [ ] `pnpm --filter server lint` passes.
 
 **Dependencies:** None.
 
 **Files likely touched:**
 
-- `docs/ARCHITECTURE_AND_API.md`
-- `tasks/plan.md`
+- `server/src/store/dto/browse-public-sellers.dto.ts`
+- `server/src/store/dto/store-seller.dto.ts`
+- `server/test/store-public-seller-dto.test.ts`
 
-**Estimated scope:** Small.
+**Estimated scope:** S (3 files).
 
-#### Task 2: Add MongoDB application configuration
+## Task 2: Implement the safe public sellers query
 
-**Description:** Enable one NestJS MongoDB connection using `MONGO_URI` and fail fast with
-a clear configuration error when it is absent or invalid.
+**Description:** Add a `StoreService` method that aggregates `PUBLISHED` MongoDB scripts by `sellerId`, derives seller statistics, sorts/pages the results, then hydrates only MySQL sellers whose status is `APPROVED`.
 
 **Acceptance criteria:**
 
-- [x] Local URI defaults only in `.env.example`, never in application code.
-- [x] Nest application creates one Mongoose connection at bootstrap.
-- [x] MySQL authentication modules remain unchanged.
+- [ ] Each returned seller owns at least one published script and is `APPROVED`.
+- [ ] Statistics are calculated from published scripts only; `ratingAvg` is a rating-count-weighted average, with `0` when no ratings exist.
+- [ ] The method makes one aggregate query and one batched MySQL lookup; it does not query MySQL once per seller.
+- [ ] Pagination metadata matches the returned contract and sort order is deterministic.
 
 **Verification:**
 
-- [ ] Start the server with a local MongoDB instance.
-- [ ] `npx tsc --noEmit` and focused module tests pass.
+- [ ] Focused service test proves status filtering, metric aggregation, deterministic sorting, page metadata, and that sensitive fields are absent.
+- [ ] `pnpm --filter server test:store-sellers` passes.
 
 **Dependencies:** Task 1.
 
 **Files likely touched:**
 
-- `server/src/app.module.ts`
-- `server/src/config/*` or `server/src/mongo/*`
-- `server/.env.example`
-
-**Estimated scope:** Small.
-
-#### Task 3: Define MongoDB script and tag schemas with indexes
-
-**Description:** Create Mongoose schemas for public script data, approved versions, and
-tags. Define indexes for slug lookup, catalog filtering, seller ownership, and search.
-
-**Acceptance criteria:**
-
-- [x] `ScriptDocument` has `sellerId` as a MySQL string reference, never a user object.
-- [x] `slug` is unique; catalog indexes support `status`, `publishedAt`, `sellerId`, and tags.
-- [x] Storage references point only to scrubbed artifacts.
-
-**Verification:**
-
-- [ ] Schema unit tests cover required fields, unique slug, and status values.
-- [ ] MongoDB indexes are created on a fresh local database.
-
-**Dependencies:** Task 2.
-
-**Files likely touched:**
-
-- `server/src/scripts/schemas/script.schema.ts`
-- `server/src/scripts/schemas/script-version.schema.ts`
-- `server/src/tags/schemas/tag.schema.ts`
-- `server/src/scripts/scripts.module.ts`
-
-**Estimated scope:** Medium.
-
-### Checkpoint: Foundation
-
-- [ ] Server starts with MySQL identity storage and MongoDB marketplace storage.
-- [ ] No existing MySQL marketplace table is written by new code.
-- [ ] Team reviews schemas and indexes before endpoint work begins.
-
-### Phase 1: Public storefront vertical slice
-
-#### Task 4: Define public store DTOs and response types
-
-**Description:** Define separate list and detail response DTOs. Do not expose seller-only,
-admin-only, or raw graph fields.
-
-**Acceptance criteria:**
-
-- [x] Summary response has name, slug, description, thumbnail, seller display name, tags,
-  latest approved version, and public statistics.
-- [x] Detail response DTO adds sanitized description, gallery, approved version history, and
-  derived capabilities.
-- [x] Pagination and sort query DTO validates allowlisted values only.
-
-**Verification:**
-
-- [ ] Swagger displays both endpoint contracts.
-- [ ] DTO validation tests reject unsupported sort/filter fields.
-
-**Dependencies:** Task 3.
-
-**Files likely touched:**
-
-- `server/src/store/dto/browse-scripts.dto.ts`
-- `server/src/store/dto/store-script.dto.ts`
-- `web/src/types.ts`
-
-**Estimated scope:** Medium.
-
-#### Task 5: Implement public catalog query
-
-**Description:** Read published script summaries from MongoDB with search, tag filtering,
-sorting, and skip/limit pagination.
-
-**Acceptance criteria:**
-
-- [x] Endpoint implementation returns only `PUBLISHED` scripts with an `APPROVED` latest version.
-- [x] Search, tag filters, pagination, and every advertised sort order are deterministic.
-- [x] Response shape matches Task 4 exactly.
-
-**Verification:**
-
-- [ ] Integration tests seed MongoDB and assert filters, sort order, and pagination totals.
-- [ ] Anonymous request succeeds; seller/admin-only fields are absent.
-
-**Dependencies:** Task 4.
-
-**Files likely touched:**
-
 - `server/src/store/store.service.ts`
-- `server/src/store/store.controller.ts`
-- `server/src/store/store.module.ts`
-- `server/test/store-catalog.test.ts`
+- `server/test/store-sellers.service.test.ts`
+- `server/package.json`
 
-**Estimated scope:** Medium.
+**Estimated scope:** S (3 files).
 
-#### Task 6: Implement public script detail query
+## Task 3: Expose the controller endpoint and document it
 
-**Description:** Retrieve one published script by slug or MongoDB ID and return only its
-approved version history.
+**Description:** Add `GET /api/v1/store/sellers` to `StoreController`, delegating to the new service method and documenting the response in Swagger.
 
 **Acceptance criteria:**
 
-- [x] Unknown, draft, archived, or non-published scripts return `404 script_not_found`.
-- [x] Detail includes only approved versions and sanitized public fields.
-- [x] The latest approved version is explicit and stable.
+- [ ] Endpoint is public and does not carry seller/admin guards.
+- [ ] Controller passes validated DTO input unchanged to the service.
+- [ ] Swagger describes the page response and the eligibility rule.
 
 **Verification:**
 
-- [ ] Integration tests cover slug lookup, ID lookup, and each hidden status.
-- [ ] Response validates against the frontend type.
+- [ ] Focused controller test or e2e request returns `200` for anonymous access and the documented shape.
+- [ ] `pnpm --filter server build` passes.
 
-**Dependencies:** Task 5.
+**Dependencies:** Tasks 1–2.
 
 **Files likely touched:**
 
-- `server/src/store/store.service.ts`
 - `server/src/store/store.controller.ts`
-- `server/test/store-detail.test.ts`
+- `server/test/store-sellers.controller.test.ts` (or the existing store endpoint test file)
 
-**Estimated scope:** Small.
+**Estimated scope:** S (2 files).
 
-#### Task 7: Replace catalog and detail mock reads in the web
+### Checkpoint: Public API ready
 
-**Description:** Use `web/src/lib/api.ts` and `useFetch` in storefront features while
-retaining the existing visual design. Keep mock data only as temporary seed fixtures.
+- [ ] DTO, service, and controller tests pass.
+- [ ] `pnpm --filter server lint` and `pnpm --filter server build` pass.
+- [ ] Manual anonymous request returns only approved sellers with published scripts.
+- [ ] Contract reviewed before any frontend migration.
+
+### Phase 2: Connect section 07
+
+## Task 4: Replace home mock data with the public contract
+
+**Description:** Add frontend `PublicSellerSummary` types and fetch the new endpoint in section 07. Render three returned sellers and preserve the existing loading, empty, and error behavior used by other home rails.
 
 **Acceptance criteria:**
 
-- [x] `/`, `/scripts`, and `/scripts/:slug` render API data.
-- [x] Loading, empty, and API-error states are localized.
-- [x] No public page imports the runtime mock catalog data.
+- [ ] Section 07 requests `/store/sellers?skip=0&limit=3&sort=popular`.
+- [ ] It renders API statistics, not `developers.slice(0, 3)`.
+- [ ] Loading state does not cause layout shift; an empty/error response does not leave a blank section.
+- [ ] The UI does not display public contact buttons or profile links until a public seller-detail contract exists.
 
 **Verification:**
 
-- [ ] Manual check with seeded MongoDB scripts.
-- [x] `cd web && npx tsc --noEmit && pnpm lint && pnpm build` passes.
+- [ ] Component test covers loading, populated, empty, and API-error states.
+- [ ] `pnpm --filter web lint` and `pnpm --filter web build` pass.
+- [ ] Manual check at 320px, 768px, and 1440px shows exactly the expected public information.
 
-**Dependencies:** Tasks 5 and 6.
+**Dependencies:** Checkpoint: Public API ready.
 
 **Files likely touched:**
 
-- `web/src/features/catalog/*`
-- `web/src/features/home/*`
-- `web/src/app/(store)/scripts/*`
 - `web/src/types.ts`
+- `web/src/app/(store)/page.tsx`
+- `web/src/features/developers/seller-summary-card.tsx`
+- `web/src/features/developers/*test.tsx`
 
-**Estimated scope:** Large; split catalog and detail into separate pull requests if needed.
+**Estimated scope:** M (4 files).
 
-### Checkpoint: Public storefront
+### Checkpoint: End-to-end marketplace sellers
 
-- [ ] Published MongoDB scripts appear on the home page and catalog.
-- [ ] Detail pages display the same script selected from the catalog.
-- [ ] A draft script cannot be obtained through public API or direct URL.
-
-### Phase 2: Seller lifecycle vertical slices
-
-#### Task 8: Move seller-owned script create and update persistence to MongoDB
-
-**Description:** Keep JWT seller authentication in MySQL but persist the sanitized script
-listing and its first pending version in MongoDB.
-
-**Acceptance criteria:**
-
-- [ ] Only an approved MySQL seller can create or update its own MongoDB scripts.
-- [ ] Upload pipeline stores only scrubbed graph references and derived metadata.
-- [ ] MongoDB writes are atomic within the script/version lifecycle where possible.
-
-**Verification:**
-
-- [ ] Existing graph scrub tests pass.
-- [ ] Integration test verifies a seller cannot write another seller's script.
-
-**Dependencies:** Tasks 2 and 3.
-
-**Files likely touched:**
-
-- `server/src/scripts/scripts.service.ts`
-- `server/src/scripts/schemas/*`
-- `server/test/scripts-mongo.test.ts`
-
-**Estimated scope:** Large; split create and update-version paths if implementation exceeds five files.
-
-#### Task 9: Move admin review and publish state to MongoDB
-
-**Description:** Persist review decisions in MongoDB while retaining MySQL admin identity
-and guards. Publishing changes the document visible to the public catalog.
-
-**Acceptance criteria:**
-
-- [ ] Only MySQL-authenticated admins can approve or reject MongoDB versions.
-- [ ] Approval remains blocked if embedded credentials are present.
-- [ ] Rejecting an update never unpublishes the previous approved version.
-
-**Verification:**
-
-- [ ] Admin integration tests cover approve, reject, credentials gate, and rollback behavior.
-- [ ] Public catalog reflects only the approved version after review.
-
-**Dependencies:** Task 8.
-
-**Files likely touched:**
-
-- `server/src/admin/admin.service.ts`
-- `server/src/scripts/scripts.service.ts`
-- `server/test/admin-review-mongo.test.ts`
-
-**Estimated scope:** Medium.
-
-### Phase 3: Entitlements and artifacts
-
-#### Task 10: Move keys, members, redemptions, and devices to MongoDB
-
-**Description:** Store marketplace entitlement state in MongoDB while retaining seller
-authorization in MySQL and buyer identity from Flowdesk.
-
-**Acceptance criteria:**
-
-- [ ] Key redemption and membership updates are transaction-safe.
-- [ ] Shop-wide and script-specific keys remain supported.
-- [ ] Blocked devices prevent licence issuance.
-
-**Verification:**
-
-- [ ] Focused key and licence tests pass against MongoDB.
-- [ ] Concurrent redeem test cannot exceed a key's `maxUses`.
-
-**Dependencies:** Task 9.
-
-**Files likely touched:**
-
-- `server/src/keys/*`
-- `server/src/members/*`
-- `server/src/app-client/*`
-- `server/test/keys-mongo.test.ts`
-
-**Estimated scope:** Large; implement keys and members as separate tasks if needed.
-
-#### Task 11: Move build metadata to MongoDB and retire MySQL marketplace writes
-
-**Description:** Persist build metadata in MongoDB and remove remaining Prisma writes for
-marketplace resources after all flows have MongoDB coverage.
-
-**Acceptance criteria:**
-
-- [ ] Build records reference MongoDB script/version IDs consistently.
-- [ ] No new runtime path writes MySQL marketplace tables.
-- [ ] Existing files continue to use `StorageService` references.
-
-**Verification:**
-
-- [ ] End-to-end seller upload → review → public listing → buyer entitlement flow passes.
-- [ ] Database access audit confirms Prisma is used only by identity modules.
-
-**Dependencies:** Task 10.
-
-**Files likely touched:**
-
-- `server/src/builds/*`
-- `server/src/scripts/*`
-- `server/prisma/schema.prisma`
-- `server/test/builds-mongo.test.ts`
-
-**Estimated scope:** Large; complete only after team migration review.
+- [ ] A seller approved in MySQL and with published MongoDB scripts appears in section 07.
+- [ ] A pending/suspended seller, or approved seller without published scripts, does not appear.
+- [ ] Section 07 has no console errors and no sensitive seller data in the response or DOM.
 
 ## Risks and mitigations
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Dual MySQL/MongoDB writes create inconsistent data | High | Assign one source of truth per resource; use MySQL only for identity IDs. |
-| Public API leaks graph or scan data | High | Separate public DTOs and contract tests; use explicit Mongo projections. |
-| MongoDB counters lose updates | Medium | Use atomic `$inc` and transactions for bounded key redemptions. |
-| Storefront expects mock-only fields | Medium | Map UI to real contract or add an approved source field; do not invent data. |
-| Existing MySQL services are migrated all at once | High | Deliver public catalog first, then seller lifecycle, then entitlement. |
+| Seller identity is MySQL but catalog scripts are MongoDB | High | Aggregate script metrics in MongoDB and hydrate seller identities in one explicit MySQL query; test disagreement between sources. |
+| Current UI mock promises unsupported fields (avatar, bio, contact, per-seller detail URL) | High | Do not put these fields in v1. Render a safe summary card; design profile schema/API separately. |
+| Metrics are semantically unclear | Medium | Define `popular` and weighted rating in the contract and cover them with fixtures. |
+| Cross-store pagination can be inconsistent if a seller status changes during the request | Low | Filter MySQL status after aggregation; accept eventual consistency for a public browse endpoint and document it. |
 
-## Open questions requiring team approval
+## Open questions
 
-- Is MongoDB the source of truth for `tags`, `keys`, `members`, and `miniAppBuilds`, as well as scripts?
-- Should seller public profile fields remain in MySQL and be read dynamically, or be copied as a MongoDB public projection?
-- Which UI fields are real product requirements: price, category, platform, seller contact, watch count?
-- Are existing MySQL marketplace rows disposable development data, or must they be migrated into MongoDB?
-- Is MongoDB replica-set mode available locally and in deployment for transactions?
+1. Should section 07 show only the top three sellers (`limit=3`), or should this endpoint also be the source for the full `/developers` directory now?
+2. Is an `APPROVED` seller allowed to be visually labelled "verified", or is a separate verification state required?
+3. Which public profile fields should sellers be able to manage later (slug, avatar, bio, specialties), and who moderates them?
+4. Is `downloads` the intended definition of popularity, or should ranking use a different business metric?

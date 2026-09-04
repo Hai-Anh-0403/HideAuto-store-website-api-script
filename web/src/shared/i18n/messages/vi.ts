@@ -71,6 +71,8 @@ export const vi: Record<MessageKey, string> = {
     'Tìm tác vụ, người bán, nền tảng hoặc nền tảng mạng xã hội',
   'catalog.search': 'Tìm kiếm',
   'catalog.filters': 'Bộ lọc',
+  'catalog.all': 'Tất cả',
+  'catalog.categories': 'Danh mục',
   'catalog.status': 'Trạng thái',
   'catalog.socialPlatforms': 'Nền tảng',
   'catalog.clearAll': 'Xóa tất cả',
@@ -82,6 +84,8 @@ export const vi: Record<MessageKey, string> = {
   'catalog.newest': 'Mới nhất',
   'catalog.mostWatched': 'Được quan tâm nhất',
   'catalog.recentlyUpdated': 'Cập nhật gần đây',
+  'catalog.priceAsc': 'Giá tăng dần',
+  'catalog.priceDesc': 'Giá giảm dần',
   'catalog.searchChip': 'Tìm kiếm: {value}',
   'catalog.noMatchTitle': 'Không có kịch bản phù hợp.',
   'catalog.noMatchDescription':

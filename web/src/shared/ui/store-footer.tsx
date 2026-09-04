@@ -17,7 +17,7 @@ export function StoreFooter() {
           <div>
             <p className="label">{t('footer.discover')}</p>
             <Link href="/scripts">{t('footer.browseScripts')}</Link>
-            <Link href="/developers">{t('navigation.sellers')}</Link>
+            <Link href="/sellers">{t('navigation.sellers')}</Link>
           </div>
           <div>
             <p className="label">{t('footer.resources')}</p>

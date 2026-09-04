@@ -1,6 +1,37 @@
 import type { Metadata, Viewport } from 'next'
+import { cookies } from 'next/headers'
+import { Manrope, JetBrains_Mono, Barlow, Barlow_Condensed } from 'next/font/google'
 import { HtmlLang } from '@/components/HtmlLang'
+import { I18nProvider, type Locale } from '@/i18n'
 import '@/styles/global.css'
+
+const fontSans = Manrope({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-sans',
+  display: 'swap',
+})
+
+const fontMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-mono',
+  display: 'swap',
+})
+
+const fontBarlow = Barlow({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['400', '600', '700'],
+  variable: '--font-barlow',
+  display: 'swap',
+})
+
+const fontBarlowCondensed = Barlow_Condensed({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['600', '700'],
+  variable: '--font-barlow-condensed',
+  display: 'swap',
+})
 
 /**
  * `metadataBase` resolves the relative OG/icon URLs below into absolute ones, which is
@@ -55,24 +86,23 @@ export const viewport: Viewport = {
 // lockstep with `src/lib/display.ts` (same keys, same allowed values).
 const applyDisplayPrefs = `(function(){try{var e=document.documentElement,t=localStorage.getItem('ui.theme');if(t==='light'||t==='dark')e.setAttribute('data-theme',t);}catch(_){}})();`
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // `lang` is the server's best guess; HtmlLang corrects it once the stored locale is
-  // readable. suppressHydrationWarning covers that and the theme attribute.
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies()
+  const rawLocale = cookieStore.get('locale')?.value
+  const initialLocale: Locale = rawLocale === 'en' ? 'en' : 'vi'
+
   return (
-    <html lang="vi" suppressHydrationWarning>
-      <head>
-        {/* Design system fonts: Manrope for text, JetBrains Mono for figures. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html
+      lang={initialLocale}
+      className={`${fontSans.variable} ${fontMono.variable} ${fontBarlow.variable} ${fontBarlowCondensed.variable}`}
+      suppressHydrationWarning
+    >
       <body>
         <script dangerouslySetInnerHTML={{ __html: applyDisplayPrefs }} />
-        <HtmlLang />
-        {children}
+        <I18nProvider initialLocale={initialLocale}>
+          <HtmlLang />
+          {children}
+        </I18nProvider>
       </body>
     </html>
   )

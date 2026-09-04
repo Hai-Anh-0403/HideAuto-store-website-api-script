@@ -21,7 +21,7 @@ export function DeveloperCard({ developer }: { developer: Developer }) {
       />
       <div className="min-w-0">
         <h2 className="font-heading font-bold text-xl sm:text-2xl uppercase text-[var(--ink)] my-0 flex items-center flex-wrap gap-1">
-          <Link href={`/developers/${developer.slug}`} className="hover:text-[var(--steel)] transition-colors">
+          <Link href={`/sellers/${developer.slug}`} className="hover:text-[var(--steel)] transition-colors">
             {developer.name}
           </Link>
           {developer.verified && (
@@ -61,10 +61,13 @@ export function DeveloperCard({ developer }: { developer: Developer }) {
         </p>
       </div>
       <a
-        className="primary developer-contact-button inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--steel)] text-[var(--bg)] font-heading font-semibold text-sm hover:opacity-90 transition-opacity whitespace-nowrap self-start sm:self-center mt-2 sm:mt-0"
+        className="primary developer-contact-button inline-flex w-[calc(100%+1.5rem)] -mx-3 h-10 items-center justify-center p-0 bg-[var(--steel)] text-[var(--bg)] font-heading font-semibold text-sm hover:opacity-90 transition-opacity whitespace-nowrap self-center sm:w-auto sm:h-auto sm:mx-0 sm:gap-2 sm:px-4 sm:py-2.5 sm:self-center mt-2 sm:mt-0"
         href={`mailto:${developer.email}`}
+        aria-label={t('seller.contact')}
+        title={t('seller.contact')}
       >
-        <Send size={15} /> {t('seller.contact')}
+        <Send size={15} aria-hidden="true" />
+        <span className="hidden sm:inline">{t('seller.contact')}</span>
       </a>
     </article>
   );

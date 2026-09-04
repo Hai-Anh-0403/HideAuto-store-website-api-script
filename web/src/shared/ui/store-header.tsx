@@ -26,12 +26,12 @@ export function StoreHeader() {
     <header>
       <div className="shell nav">
         <Link className="brand" href="/">
-          <Image src="/images/icon.png" alt="HideAuto" width={28} height={28} />
+          <Image src="/images/icon.png" alt="HideAuto" width={28} height={28} priority />
           <span>HIDEAUTO</span>
         </Link>
         <nav>
           <Link href="/scripts">{t('navigation.scripts')}</Link>
-          <Link href="/developers">{t('navigation.sellers')}</Link>
+          <Link href="/sellers">{t('navigation.sellers')}</Link>
           <Link href="/#docs">{t('navigation.docs')}</Link>
         </nav>
         <div className="nav-actions">
@@ -78,7 +78,7 @@ export function StoreHeader() {
               <Link href="/scripts" onClick={() => setMenuOpen(false)}>
                 {t('navigation.scripts')}
               </Link>
-              <Link href="/developers" onClick={() => setMenuOpen(false)}>
+              <Link href="/sellers" onClick={() => setMenuOpen(false)}>
                 {t('navigation.sellers')}
               </Link>
               <Link href="/#docs" onClick={() => setMenuOpen(false)}>

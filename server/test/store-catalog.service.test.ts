@@ -24,6 +24,7 @@ async function run() {
               sellerId: 'mysql-seller-1',
               tagIds: [tagId],
               latestVersion: { _id: versionId, version: '1.2.3' },
+              price: '$39',
               ratingAvg: 4.5,
               ratingCount: 12,
               downloads: 34,
@@ -41,6 +42,10 @@ async function run() {
     find: () => ({
       lean: () =>
         Promise.resolve([{ _id: tagId, name: 'Browser', slug: 'browser' }]),
+      sort: () => ({
+        lean: () =>
+          Promise.resolve([{ _id: tagId, name: 'Browser', slug: 'browser' }]),
+      }),
     }),
   };
   const prisma = {
@@ -75,6 +80,9 @@ async function run() {
       seller: { displayName: 'Acme Automation' },
       tags: [{ id: tagId.toString(), name: 'Browser', slug: 'browser' }],
       latestApprovedVersion: '1.2.3',
+      price: '$39',
+      priceAmount: 29,
+      currency: 'USD',
       statistics: { ratingAvg: 4.5, ratingCount: 12, downloads: 34, views: 56 },
       publishedAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-02T00:00:00.000Z',
@@ -93,14 +101,22 @@ async function run() {
     'views sort must be represented in the MongoDB pipeline',
   );
 
-  for (const sort of ['popular', 'newest', 'updated'] as const) {
+  for (const sort of ['popular', 'newest', 'updated', 'price_asc', 'price_desc'] as const) {
     await service.browsePublic(Object.assign(new BrowsePublicScriptsDto(), {
       sort,
       skip: 0,
       limit: 20,
     }));
+    const expectedField =
+      sort === 'popular'
+        ? 'ratingAvg'
+        : sort === 'newest'
+        ? 'publishedAt'
+        : sort === 'updated'
+        ? 'updatedAt'
+        : 'priceAmount';
     assert.ok(
-      JSON.stringify(aggregatePipeline).includes(sort === 'popular' ? 'ratingAvg' : sort === 'newest' ? 'publishedAt' : 'updatedAt'),
+      JSON.stringify(aggregatePipeline).includes(expectedField),
       `${sort} sort must be represented in the MongoDB pipeline`,
     );
   }
@@ -113,6 +129,11 @@ async function run() {
     })),
     (error: unknown) => (error as { response?: { code?: string } }).response?.code === 'invalid_tag_ids',
   );
+
+  const tags = await service.publicTags();
+  assert.equal(tags.length, 1);
+  assert.equal(tags[0].name, 'Browser');
+  assert.equal(tags[0].id, tagId.toString());
 
   console.log('public catalog service tests passed');
 }

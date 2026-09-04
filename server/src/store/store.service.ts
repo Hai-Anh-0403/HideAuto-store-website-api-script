@@ -26,6 +26,9 @@ interface CatalogAggregateRow extends CatalogReferenceRow {
   shortDescription: string;
   thumbnailStorageKey: string | null;
   latestVersion: { _id: Types.ObjectId; version: string };
+  price?: string;
+  priceAmount?: number;
+  currency?: string;
   ratingAvg: number;
   ratingCount: number;
   downloads: number;
@@ -50,6 +53,9 @@ interface PublicScriptDetailRow extends CatalogReferenceRow {
   slug: string;
   name: string;
   shortDescription: string;
+  price?: string;
+  priceAmount?: number;
+  currency?: string;
   descriptionHtml: string | null;
   thumbnailStorageKey: string | null;
   galleryStorageKeys: string[];
@@ -121,6 +127,11 @@ export class StoreService {
         },
       },
       { $unwind: '$latestVersion' },
+      {
+        $addFields: {
+          priceAmount: { $ifNull: ['$priceAmount', 29] },
+        },
+      },
       { $sort: this.catalogSort(dto.sort ?? 'popular') },
       {
         $facet: {
@@ -149,6 +160,9 @@ export class StoreService {
           .map((tagId) => tagMap.get(tagId.toString()))
           .filter((tag): tag is NonNullable<typeof tag> => Boolean(tag)),
         latestApprovedVersion: script.latestVersion.version,
+        price: script.price || '$29',
+        priceAmount: script.priceAmount ?? 29,
+        currency: script.currency || 'USD',
         statistics: {
           ratingAvg: script.ratingAvg,
           ratingCount: script.ratingCount,
@@ -218,6 +232,9 @@ export class StoreService {
         .map((tagId) => tagMap.get(tagId.toString()))
         .filter((tag): tag is NonNullable<typeof tag> => Boolean(tag)),
       latestApprovedVersion: latestVersion.version,
+      price: script.price || '$29',
+      priceAmount: script.priceAmount ?? 29,
+      currency: script.currency || 'USD',
       statistics: {
         ratingAvg: script.ratingAvg,
         ratingCount: script.ratingCount,
@@ -259,6 +276,10 @@ export class StoreService {
         return { updatedAt: -1, _id: -1 };
       case 'views':
         return { views: -1, publishedAt: -1 };
+      case 'price_asc':
+        return { priceAmount: 1, publishedAt: -1, _id: -1 };
+      case 'price_desc':
+        return { priceAmount: -1, publishedAt: -1, _id: -1 };
       case 'popular':
         return { ratingAvg: -1, ratingCount: -1, publishedAt: -1 };
     }
@@ -281,6 +302,15 @@ export class StoreService {
         { id: tag._id.toString(), name: tag.name, slug: tag.slug },
       ]),
     );
+  }
+
+  async publicTags() {
+    const tags = await this.tagModel.find().sort({ name: 1 }).lean<PublicTagRow[]>();
+    return tags.map((tag) => ({
+      id: tag._id.toString(),
+      name: tag.name,
+      slug: tag.slug,
+    }));
   }
 
   private async sellerNameMap(items: CatalogReferenceRow[]) {
