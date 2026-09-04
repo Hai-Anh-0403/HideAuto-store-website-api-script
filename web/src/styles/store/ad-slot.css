@@ -1,0 +1,38 @@
+.ad-slot {
+  min-height: 168px;
+  margin: 18px 0;
+  border: 1px dashed color-mix(in srgb, var(--steel) 52%, var(--line));
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 10px,
+    color-mix(in srgb, var(--steel) 4%, transparent) 10px,
+    color-mix(in srgb, var(--steel) 4%, transparent) 11px
+  );
+  color: var(--dim);
+  text-align: center;
+}
+
+.ad-slot span {
+  font: 9px 'JetBrains Mono';
+  color: var(--steel);
+  letter-spacing: 0.12em;
+}
+
+.ad-slot strong {
+  font: 600 19px 'Barlow Condensed';
+  text-transform: uppercase;
+}
+
+.ad-slot p {
+  margin: 0;
+  font-size: 11px;
+}
+
+.ad-slot-compact {
+  min-height: 82px;
+}

@@ -1,4 +1,8 @@
-const BASE = '/api/v1'
+/**
+ * Defaults to the existing same-origin API. Set `NEXT_PUBLIC_API_BASE_URL` to
+ * `http://localhost:3002/api/v1` only when evaluating the isolated MongoDB API.
+ */
+const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api/v1').replace(/\/$/, '')
 const TOKEN_KEY = 'storeautohide.token'
 
 /**

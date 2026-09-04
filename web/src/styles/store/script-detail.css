@@ -1,0 +1,226 @@
+.detail-media {
+  position: relative;
+  height: 240px;
+  margin: 25px 0;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  margin-inline: 0;
+}
+
+.detail-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.72) contrast(1.05);
+}
+
+.detail-media figcaption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 7px 10px;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  color: var(--steel);
+  font: 10px 'JetBrains Mono';
+  letter-spacing: 0.08em;
+}
+
+.script-detail-info {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(380px, 1.2fr);
+  gap: 42px;
+  margin-top: 54px;
+  padding: 34px 0;
+  border-block: 1px solid var(--line);
+}
+
+.script-detail-info h2 {
+  font-size: 36px;
+}
+
+.script-detail-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+
+.script-detail-facts div {
+  min-width: 0;
+  padding: 16px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.script-detail-facts dt {
+  color: var(--dim);
+  font: 9px 'JetBrains Mono';
+  letter-spacing: 0.08em;
+}
+
+.script-detail-facts dd {
+  margin: 7px 0 0;
+  overflow-wrap: anywhere;
+  font: 600 17px 'Barlow Condensed';
+  text-transform: uppercase;
+}
+
+.script-detail-includes {
+  padding: 30px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.script-detail-includes > .label {
+  margin: 0 0 14px;
+}
+
+.script-detail-includes ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.script-detail-includes li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.script-detail-includes li svg {
+  flex: 0 0 auto;
+  color: var(--steel);
+}
+
+.script-detail-seller {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.script-detail-seller > img {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.script-detail-seller .label,
+.script-detail-seller p {
+  margin: 0;
+}
+
+.script-detail-seller h2 {
+  margin: 4px 0;
+  font-size: 26px;
+}
+
+.script-detail-seller p:not(.label) {
+  color: var(--muted);
+}
+
+.script-detail-seller > a,
+.script-recommendations .heading > a {
+  color: var(--steel);
+  text-decoration: none;
+  font: 600 14px 'Barlow Condensed';
+}
+
+.script-recommendations {
+  padding: 54px 0 0;
+}
+
+.purchase {
+  border: 1px solid var(--line);
+  height: max-content;
+  padding: 20px;
+}
+
+.purchase > strong {
+  display: block;
+  font: 700 34px 'Barlow Condensed';
+  margin: 12px 0;
+}
+
+.purchase > button {
+  width: 100%;
+  margin-top: 9px;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  padding: 8px;
+}
+
+.purchase button span {
+  float: right;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.purchase button.primary {
+  background: var(--steel);
+  color: var(--bg);
+  border: 0;
+  text-align: center;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  font: 600 15px 'Barlow Condensed';
+}
+
+.purchase small {
+  display: flex;
+  gap: 6px;
+  color: var(--dim);
+  margin-top: 16px;
+}
+
+.purchase > .contact-link,
+.contact-form > .primary {
+  width: 100%;
+  margin-top: 18px;
+  min-height: 38px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  background: var(--steel);
+  color: var(--bg);
+  border: 0;
+  font: 600 15px 'Barlow Condensed';
+}
+
+.contact-form label {
+  display: block;
+  margin-top: 16px;
+  font-weight: 700;
+}
+
+.contact-form input,
+.contact-form textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.contact-form textarea {
+  resize: vertical;
+}

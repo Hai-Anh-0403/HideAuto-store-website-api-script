@@ -1,0 +1,232 @@
+.seller-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+
+.seller-summary-card {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 16px;
+  padding: 20px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.seller-summary-card > img {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.seller-summary-card__content {
+  min-width: 0;
+}
+
+.seller-summary-card__rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--steel);
+  font-size: 11px;
+}
+
+.seller-summary-card h3 {
+  margin: 5px 0 4px;
+  font: 600 20px 'Barlow Condensed';
+  text-transform: uppercase;
+}
+
+.seller-summary-card h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.seller-summary-card > div > p:not(.seller-summary-card__rating) {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.seller-summary-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.seller-summary-card__stats b {
+  color: var(--ink);
+}
+
+.seller-summary-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  color: var(--steel);
+  text-decoration: none;
+  font: 600 13px 'Barlow Condensed';
+}
+
+.seller-summary-card__link svg {
+  transition: transform 180ms ease;
+}
+
+.seller-summary-card__link:hover svg {
+  transform: translateX(3px);
+}
+
+.developer-directory-page > .label {
+  display: block;
+  margin: 0 0 22px;
+}
+
+.developer-profile {
+  max-width: 760px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 34px;
+  margin-bottom: 36px;
+}
+
+.developer-profile__header {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+
+.developer-profile__avatar {
+  width: 128px;
+  height: 128px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.developer-profile__header .label {
+  margin: 0 0 10px;
+}
+
+.developer-profile__header h1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.developer-profile__header .lead {
+  margin: 10px 0;
+}
+
+.developer-profile__stats,
+.developer-profile__contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 12px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.developer-profile__stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.developer-profile__stats span:first-child {
+  color: var(--steel);
+}
+
+.developer-profile__stats b {
+  color: var(--ink);
+}
+
+.developer-profile__contact {
+  overflow-wrap: anywhere;
+}
+
+.developer-profile > p:not(.label) {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.developer-cards {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.developer-cards article {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  gap: 18px;
+  align-items: start;
+  border: 1px solid var(--line);
+  padding: 18px;
+}
+
+.developer-cards article > img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.developer-cards h2 {
+  font-size: 28px;
+  margin: 0;
+}
+
+.developer-cards h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.developer-verified,
+.seller-verified {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  margin-left: 5px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--steel);
+  color: var(--bg);
+  font: 700 11px/1 Barlow;
+  vertical-align: 2px;
+}
+
+.developer-cards h2 .developer-verified {
+  color: var(--bg);
+}
+
+.developer-cards p {
+  margin: 7px 0;
+  color: var(--muted);
+}
+
+.developer-stats,
+.developer-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.developer-contact-button {
+  min-height: 38px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 0 13px;
+  text-decoration: none;
+}

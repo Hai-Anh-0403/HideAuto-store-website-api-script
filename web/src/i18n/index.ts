@@ -3,10 +3,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { en } from './en'
 import { vi } from './vi'
+import { en as storefrontEn } from '@/shared/i18n/messages/en'
+import { vi as storefrontVi } from '@/shared/i18n/messages/vi'
 
-const dicts = { en, vi } as const
+const dicts = {
+  en: { ...en, ...storefrontEn },
+  vi: { ...vi, ...storefrontVi },
+} as const
 type Locale = keyof typeof dicts
-type Key = keyof typeof vi
+type Key = keyof typeof dicts.vi
 
 const DEFAULT_LOCALE: Locale = 'vi'
 
@@ -27,11 +32,19 @@ function applyStoredLocale(): void {
   if (storedLocaleApplied || typeof window === 'undefined') return
   storedLocaleApplied = true
 
-  const stored = localStorage.getItem('locale')
-  if (stored && stored !== currentLocale && stored in dicts) {
-    currentLocale = stored as Locale
-    listeners.forEach((fn) => fn())
-  }
+  // Defer to macrotask so the initial React hydration pass completes consistently
+  // with DEFAULT_LOCALE across all components before any stored preference is applied.
+  setTimeout(() => {
+    try {
+      const stored = localStorage.getItem('locale')
+      if (stored && stored !== currentLocale && stored in dicts) {
+        currentLocale = stored as Locale
+        listeners.forEach((fn) => fn())
+      }
+    } catch {
+      // Ignore errors when localStorage is disabled or restricted
+    }
+  }, 0)
 }
 
 export type MessageKey = Key
@@ -65,7 +78,11 @@ export function useI18n() {
 
   const setLocale = useCallback((loc: Locale) => {
     currentLocale = loc
-    localStorage.setItem('locale', loc)
+    try {
+      localStorage.setItem('locale', loc)
+    } catch {
+      // Ignore errors when localStorage is restricted
+    }
     listeners.forEach((fn) => fn())
   }, [])
 

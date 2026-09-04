@@ -16,6 +16,49 @@ export interface Page<T> {
   limit: number
 }
 
+/** Public, anonymous store responses. They intentionally exclude seller identity and artifact data. */
+export interface PublicTag {
+  id: string
+  name: string
+  slug: string
+}
+
+export interface PublicScriptStatistics {
+  ratingAvg: number
+  ratingCount: number
+  downloads: number
+  views: number
+}
+
+export interface PublicScriptSummary {
+  id: string
+  slug: string
+  name: string
+  shortDescription: string
+  thumbnailUrl: string | null
+  seller: { displayName: string }
+  tags: PublicTag[]
+  latestApprovedVersion: string
+  statistics: PublicScriptStatistics
+  publishedAt: string
+  updatedAt: string
+}
+
+export interface PublicScriptVersion {
+  id: string
+  version: string
+  changelog: string | null
+  releasedAt: string | null
+  createdAt: string
+}
+
+export interface PublicScriptDetail extends PublicScriptSummary {
+  descriptionHtml: string | null
+  galleryUrls: string[]
+  capabilities: string[]
+  versions: PublicScriptVersion[]
+}
+
 export interface Token {
   access_token: string
   token_type: string

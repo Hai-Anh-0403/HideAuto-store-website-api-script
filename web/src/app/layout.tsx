@@ -20,6 +20,11 @@ export const metadata: Metadata = {
     'Cổng seller của Store-HideAuto: đăng mini app automation cho hideflow, phát khoá ' +
     'kích hoạt và quản lý người mua.',
   applicationName: 'Store-HideAuto',
+  icons: {
+    icon: '/images/icon.png',
+    shortcut: '/images/icon.png',
+    apple: '/images/icon.png',
+  },
   openGraph: {
     type: 'website',
     siteName: 'Store-HideAuto',

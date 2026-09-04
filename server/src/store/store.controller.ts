@@ -1,7 +1,8 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
+import { BrowsePublicScriptsDto } from './dto/browse-public-scripts.dto';
+import { PublicScriptDetailDto, PublicScriptPageDto } from './dto/store-script.dto';
 import { StoreService } from './store.service';
-import { BrowseScriptsDto } from './dto/browse-scripts.dto';
 
 @ApiTags('Store')
 @Controller('api/v1/store')
@@ -10,13 +11,15 @@ export class StoreController {
 
   @Get('scripts')
   @ApiOperation({ summary: 'Browse published scripts catalog' })
-  async browse(@Query() dto: BrowseScriptsDto) {
-    return this.storeService.browse(dto);
+  @ApiOkResponse({ type: PublicScriptPageDto })
+  async browse(@Query() dto: BrowsePublicScriptsDto) {
+    return this.storeService.browsePublic(dto);
   }
 
   @Get('scripts/:slugOrId')
   @ApiOperation({ summary: 'Get a published script by slug or ID' })
+  @ApiOkResponse({ type: PublicScriptDetailDto })
   async findOne(@Param('slugOrId') slugOrId: string) {
-    return this.storeService.findBySlugOrId(slugOrId);
+    return this.storeService.findPublicBySlugOrId(slugOrId);
   }
 }

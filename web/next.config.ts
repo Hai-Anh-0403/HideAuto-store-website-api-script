@@ -14,6 +14,9 @@ const here = dirname(fileURLToPath(import.meta.url))
 const apiOrigin = process.env.API_ORIGIN ?? 'http://localhost:3001'
 
 const config: NextConfig = {
+  images: {
+    remotePatterns: [{ protocol: 'https', hostname: 'images.unsplash.com' }],
+  },
   // Hide the floating Next.js dev overlay/logo in the corner during `next dev`.
   devIndicators: false,
   // Self-contained server bundle, but only when the Docker build asks for it: tracing

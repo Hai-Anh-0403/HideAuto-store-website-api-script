@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
 import { join } from 'path';
+import { mongoModuleOptions } from './mongo/mongo.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { StorageModule } from './storage/storage.module';
 import { LicensingModule } from './licensing/licensing.module';
@@ -25,6 +27,11 @@ import { MediaModule } from './media/media.module';
         join(process.cwd(), '.env'),
         join(process.cwd(), 'server', '.env'),
       ],
+    }),
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        mongoModuleOptions(config.get<string>('MONGO_URI')),
     }),
     PrismaModule,
     StorageModule,
