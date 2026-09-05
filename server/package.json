@@ -24,11 +24,11 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed.ts",
+    "db:create:admin-seller": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/create-admin-seller.ts",
     "db:seed:demo": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-demo.ts",
     "db:seed:mongo-frontend": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-mongo-frontend.ts",
     "db:seed:mongo-sellers": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-mongo-marketplace-sellers.ts",
-    "db:verify:mongo-sellers": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/verify-mongo-marketplace-sellers.ts",
-    "db:seed:demo:clear": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-demo.ts --clear"
+    "db:verify:mongo-sellers": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/verify-mongo-marketplace-sellers.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
