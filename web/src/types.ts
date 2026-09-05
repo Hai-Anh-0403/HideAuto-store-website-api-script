@@ -62,6 +62,17 @@ export interface PublicScriptDetail extends PublicScriptSummary {
   versions: PublicScriptVersion[]
 }
 
+export interface PublicMarketplaceSeller {
+  id: string
+  slug: string
+  displayName: string
+  verified: boolean
+  avatarUrl: string | null
+  headline: string | null
+  joinedAt: string
+  statistics: { publishedScripts: number; downloads: number; views: number; ratingAvg: number; ratingCount: number }
+}
+
 export interface Token {
   access_token: string
   token_type: string

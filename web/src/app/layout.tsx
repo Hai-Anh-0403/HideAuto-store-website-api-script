@@ -1,37 +1,16 @@
 import type { Metadata, Viewport } from 'next'
 import { cookies } from 'next/headers'
-import { Manrope, JetBrains_Mono, Barlow, Barlow_Condensed } from 'next/font/google'
+import '@fontsource/jetbrains-mono/400.css'
+import '@fontsource/jetbrains-mono/500.css'
+import '@fontsource/jetbrains-mono/600.css'
+import '@fontsource/barlow/400.css'
+import '@fontsource/barlow/600.css'
+import '@fontsource/barlow/700.css'
+import '@fontsource/barlow-condensed/600.css'
+import '@fontsource/barlow-condensed/700.css'
 import { HtmlLang } from '@/components/HtmlLang'
 import { I18nProvider, type Locale } from '@/i18n'
 import '@/styles/global.css'
-
-const fontSans = Manrope({
-  subsets: ['latin', 'vietnamese'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-sans',
-  display: 'swap',
-})
-
-const fontMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-mono',
-  display: 'swap',
-})
-
-const fontBarlow = Barlow({
-  subsets: ['latin', 'vietnamese'],
-  weight: ['400', '600', '700'],
-  variable: '--font-barlow',
-  display: 'swap',
-})
-
-const fontBarlowCondensed = Barlow_Condensed({
-  subsets: ['latin', 'vietnamese'],
-  weight: ['600', '700'],
-  variable: '--font-barlow-condensed',
-  display: 'swap',
-})
 
 /**
  * `metadataBase` resolves the relative OG/icon URLs below into absolute ones, which is
@@ -94,7 +73,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang={initialLocale}
-      className={`${fontSans.variable} ${fontMono.variable} ${fontBarlow.variable} ${fontBarlowCondensed.variable}`}
       suppressHydrationWarning
     >
       <body>

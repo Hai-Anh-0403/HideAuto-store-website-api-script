@@ -19,6 +19,7 @@ export function ScriptDetailContent({
   const { t } = useI18n();
 
   const thumbnail = script.thumbnailUrl ?? '/images/icon.png';
+  const externalThumbnail = /^https?:\/\//i.test(thumbnail);
   const rating = (script.statistics?.ratingAvg ?? 0) > 0 ? script.statistics.ratingAvg.toFixed(1) : null;
   const capabilities = script.capabilities ?? [];
   const galleryUrls = script.galleryUrls ?? [];
@@ -75,6 +76,11 @@ export function ScriptDetailContent({
               width={1200}
               height={675}
               priority
+              unoptimized={externalThumbnail}
+              onError={(event) => {
+                event.currentTarget.srcset = '';
+                event.currentTarget.src = '/images/icon.png';
+              }}
               sizes="(max-width: 760px) 100vw, (max-width: 1200px) 80vw, 800px"
               className="w-full h-full object-cover filter saturate-75 contrast-105"
             />
@@ -91,6 +97,11 @@ export function ScriptDetailContent({
                     src={url}
                     alt={`${script.name} gallery image ${idx + 1}`}
                     fill
+                    unoptimized={/^https?:\/\//i.test(url)}
+                    onError={(event) => {
+                      event.currentTarget.srcset = '';
+                      event.currentTarget.src = '/images/icon.png';
+                    }}
                     sizes="(max-width: 760px) 33vw, 240px"
                     className="object-cover"
                   />
@@ -333,4 +344,3 @@ export function ScriptDetailContent({
     </main>
   );
 }
-

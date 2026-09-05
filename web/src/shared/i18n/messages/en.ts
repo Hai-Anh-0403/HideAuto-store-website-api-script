@@ -160,6 +160,7 @@ export const en = {
     'Prepare, inspect, and move routine data with practical automation building blocks.',
   'home.products.learnMore': 'Ask about this product',
   'contact.label': 'CONTACT / SELLER',
+  'contact.directInquiry': 'Direct inquiry',
   'contact.title': 'Start a direct discussion with the seller.',
   'contact.lead':
     'Send your questions, target platform, and requirements before any agreement.',

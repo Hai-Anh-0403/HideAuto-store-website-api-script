@@ -5,8 +5,10 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { AdSlot } from '@/features/advertising/ad-slot';
 import { useI18n } from '@/i18n';
-import { developers } from './model';
-import { DeveloperCard } from './developer-card';
+import { api } from '@/lib/api';
+import { useFetch } from '@/lib/useFetch';
+import type { Page, PublicMarketplaceSeller } from '@/types';
+import { PublicSellerSummaryCard } from './public-seller-summary-card';
 
 const ITEMS_PER_PAGE = 4;
 
@@ -22,6 +24,10 @@ export function DeveloperDirectory() {
   const pageParam = Number(params.get('page'));
   const currentPage =
     Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
+  const sellers = useFetch(
+    () => api.get<Page<PublicMarketplaceSeller>>('/store/sellers?skip=0&limit=100&sort=popular'),
+    'public-seller-directory',
+  );
 
   const updateSearch = (newQuery: string) => {
     const next = new URLSearchParams(params.toString());
@@ -50,13 +56,13 @@ export function DeveloperDirectory() {
 
   const items = useMemo(
     () =>
-      developers.filter((developer) =>
+      (sellers.data?.items ?? []).filter((seller) =>
         !query ||
-        `${developer.name} ${developer.headline} ${developer.headlineVi} ${developer.specialties.join(' ')}`
+        `${seller.displayName} ${seller.headline ?? ''}`
           .toLowerCase()
           .includes(query),
       ),
-    [query],
+    [query, sellers.data],
   );
 
   const totalPages = Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE));
@@ -110,11 +116,17 @@ export function DeveloperDirectory() {
         </div>
       )}
 
-      {items.length ? (
+      {sellers.loading ? (
+        <div className="developer-cards flex flex-col gap-4 mb-8" aria-busy="true">
+          {Array.from({ length: ITEMS_PER_PAGE }).map((_, index) => (
+            <div key={index} className="h-36 bg-[var(--panel)] border border-[var(--line)] animate-pulse" />
+          ))}
+        </div>
+      ) : items.length ? (
         <>
           <div className="developer-cards flex flex-col gap-4 mb-8">
-            {visible.map((developer) => (
-              <DeveloperCard key={developer.slug} developer={developer} />
+            {visible.map((seller) => (
+              <PublicSellerSummaryCard key={seller.id} seller={seller} showContact />
             ))}
           </div>
           <AdSlot slotId="developers-after-directory" />
@@ -167,7 +179,7 @@ export function DeveloperDirectory() {
             {t('catalog.noMatchTitle')}
           </h2>
           <p className="text-sm text-[var(--muted)] max-w-md mx-auto mb-6 leading-relaxed">
-            {t('catalog.noMatchDescription')}
+            {sellers.error ?? t('catalog.noMatchDescription')}
           </p>
           <button
             className="secondary px-5 py-2.5 border border-[var(--line)] bg-transparent font-heading font-semibold text-sm text-[var(--ink)] hover:border-[var(--steel)] hover:text-[var(--steel)] transition-colors"

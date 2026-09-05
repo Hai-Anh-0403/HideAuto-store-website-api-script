@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConflictError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -7,10 +7,16 @@ import { PageDto } from '../common/dto/page.dto';
 import { readScan } from '../common/graph/workflow-graph';
 import { ListSellersDto } from './dto/list-sellers.dto';
 import { toStringArray } from '../common/json-array';
+import { MarketplaceSellerProjectorService } from '../sellers/marketplace-seller-projector.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(AdminService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly marketplaceSellerProjector: MarketplaceSellerProjectorService,
+  ) {}
 
   // ── Sellers ──────────────────────────────────────────────
 
@@ -110,7 +116,27 @@ export class AdminService {
       await this.prisma.sellerSession.deleteMany({ where: { sellerId } });
     }
 
+    await this.projectSellerOrLog({ ...updated, createdAt: seller.createdAt });
+
     return updated;
+  }
+
+  private async projectSellerOrLog(seller: {
+    id: string;
+    name: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+    createdAt: Date;
+    updatedAt: Date;
+  }): Promise<void> {
+    try {
+      await this.marketplaceSellerProjector.project(seller);
+    } catch (error) {
+      // MySQL owns seller lifecycle state; the MongoDB copy is reconciled later.
+      this.logger.error(
+        `Could not project seller ${seller.id} to MongoDB`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   // ── Scripts ──────────────────────────────────────────────

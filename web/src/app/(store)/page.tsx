@@ -5,14 +5,14 @@ import { ArrowRight, Check } from 'lucide-react';
 import Link from 'next/link';
 import { AdSlot } from '@/features/advertising';
 import { ScriptListItem } from '@/features/catalog';
-import { developers, SellerSummaryCard } from '@/features/developers';
+import { PublicSellerSummaryCard } from '@/features/developers';
 import { StoreHeader } from '@/shared/ui/store-header';
 import { StoreFooter } from '@/shared/ui/store-footer';
 import { useI18n, type MessageKey } from '@/i18n';
 import { api } from '@/lib/api';
 import { useFetch } from '@/lib/useFetch';
 import { ScriptListItemSkeleton } from '@/shared/ui/skeletons/script-list-item-skeleton';
-import type { Page, PublicScriptSummary } from '@/types';
+import type { Page, PublicMarketplaceSeller, PublicScriptSummary } from '@/types';
 
 const deliverySteps = [
   {
@@ -172,6 +172,8 @@ export default function Page() {
     () => api.get<Page<PublicScriptSummary>>('/store/scripts?sort=popular&limit=4'),
     'hero-featured',
   );
+  const featuredSellers = useFetch(() => api.get<Page<PublicMarketplaceSeller>>('/store/sellers?skip=0&limit=3&sort=popular'), 'featured-sellers');
+  const featuredSellerItems = featuredSellers.data?.items ?? [];
 
   return (
     <>
@@ -281,9 +283,17 @@ export default function Page() {
             </Link>
           </div>
           <div className="seller-summary-grid grid grid-cols-1 md:grid-cols-3 border-t border-l border-[var(--line)]">
-            {developers.slice(0, 3).map((seller) => (
-              <SellerSummaryCard key={seller.slug} seller={seller} />
-            ))}
+            {featuredSellers.loading ? (
+              Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} aria-hidden="true" className="h-44 border-r border-b border-[var(--line)] bg-[var(--panel)] animate-pulse" />
+              ))
+            ) : featuredSellerItems.length > 0 ? (
+              featuredSellerItems.map((seller) => <PublicSellerSummaryCard key={seller.id} seller={seller} />)
+            ) : (
+              <p className="col-span-full p-5 text-xs font-mono text-[var(--dim)]" role={featuredSellers.error ? 'alert' : undefined}>
+                {featuredSellers.error ?? t('catalog.noMatchDescription')}
+              </p>
+            )}
           </div>
         </section>
 

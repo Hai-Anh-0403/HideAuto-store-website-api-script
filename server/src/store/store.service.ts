@@ -13,6 +13,8 @@ import { Script } from '../scripts/schemas/script.schema';
 import { ScriptVersion } from '../scripts/schemas/script-version.schema';
 import { Tag } from '../tags/schemas/tag.schema';
 import { BadRequestError, NotFoundError } from '../common/errors';
+import { MarketplaceSeller } from '../sellers/schemas/marketplace-seller.schema';
+import { BrowsePublicSellersDto } from './dto/browse-public-sellers.dto';
 
 interface CatalogReferenceRow {
   sellerId: string;
@@ -86,7 +88,105 @@ export class StoreService {
     @InjectModel(Tag.name) private readonly tagModel: Model<Tag>,
     @InjectModel(ScriptVersion.name)
     private readonly scriptVersionModel: Model<ScriptVersion>,
+    @InjectModel(MarketplaceSeller.name)
+    private readonly marketplaceSellerModel: Model<MarketplaceSeller>,
   ) {}
+
+  async browsePublicSellers(dto: BrowsePublicSellersDto) {
+    const result = await this.marketplaceSellerModel.aggregate<{
+      items: Array<{
+        sellerId: string; slug: string; displayName: string;
+        avatarStorageKey: string | null; headline: string | null; verified: boolean; createdAt: Date;
+        statistics: { publishedScripts: number; downloads: number; views: number; ratingAvg: number; ratingCount: number };
+      }>;
+      total: Array<{ count: number }>;
+    }>([
+      { $match: { status: 'APPROVED' } },
+      { $lookup: {
+        from: 'scripts', let: { sellerId: '$sellerId' }, pipeline: [
+          { $match: { $expr: { $and: [
+            { $eq: ['$sellerId', '$$sellerId'] }, { $eq: ['$status', 'PUBLISHED'] },
+          ] } } },
+          { $group: { _id: null, publishedScripts: { $sum: 1 }, downloads: { $sum: { $ifNull: ['$downloads', 0] } }, views: { $sum: { $ifNull: ['$views', 0] } }, ratingCount: { $sum: { $ifNull: ['$ratingCount', 0] } }, weightedRating: { $sum: { $multiply: [{ $ifNull: ['$ratingAvg', 0] }, { $ifNull: ['$ratingCount', 0] }] } } } },
+        ], as: 'scriptStats',
+      } },
+      { $unwind: { path: '$scriptStats', preserveNullAndEmptyArrays: true } },
+      { $project: { _id: 0, sellerId: 1, slug: 1, displayName: 1, avatarStorageKey: 1, headline: 1, verified: 1, createdAt: 1, statistics: { publishedScripts: { $ifNull: ['$scriptStats.publishedScripts', 0] }, downloads: { $ifNull: ['$scriptStats.downloads', 0] }, views: { $ifNull: ['$scriptStats.views', 0] }, ratingCount: { $ifNull: ['$scriptStats.ratingCount', 0] }, ratingAvg: { $cond: [{ $gt: [{ $ifNull: ['$scriptStats.ratingCount', 0] }, 0] }, { $divide: ['$scriptStats.weightedRating', '$scriptStats.ratingCount'] }, 0] } } } },
+      { $sort: { 'statistics.downloads': -1, 'statistics.views': -1, sellerId: 1 } },
+      { $facet: { items: [{ $skip: dto.skip }, { $limit: dto.limit }], total: [{ $count: 'count' }] } },
+    ]);
+    const page = result[0] ?? { items: [], total: [] };
+    return new PageDto(page.items.map((seller) => ({
+      id: seller.sellerId, slug: seller.slug, displayName: seller.displayName,
+      avatarUrl: seller.avatarStorageKey ? this.mediaUrl(seller.avatarStorageKey) : null,
+      headline: seller.headline ?? null, verified: seller.verified === true, joinedAt: seller.createdAt.toISOString(), statistics: seller.statistics,
+    })), page.total[0]?.count ?? 0, dto.skip, dto.limit);
+  }
+
+  async findPublicSellerBySlugOrId(slugOrId: string) {
+    const slug = slugOrId.toLowerCase();
+    const seller = await this.marketplaceSellerModel.findOne({
+      $or: [{ slug }, { sellerId: slugOrId }],
+      status: 'APPROVED',
+    }).lean();
+
+    if (!seller) {
+      throw new NotFoundException(`Seller "${slugOrId}" not found`);
+    }
+
+    const scriptStats = await this.scriptModel.aggregate([
+      { $match: { sellerId: seller.sellerId, status: 'PUBLISHED' } },
+      {
+        $group: {
+          _id: null,
+          publishedScripts: { $sum: 1 },
+          downloads: { $sum: { $ifNull: ['$downloads', 0] } },
+          views: { $sum: { $ifNull: ['$views', 0] } },
+          ratingCount: { $sum: { $ifNull: ['$ratingCount', 0] } },
+          weightedRating: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ['$ratingAvg', 0] },
+                { $ifNull: ['$ratingCount', 0] },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const stats = scriptStats[0] ?? {
+      publishedScripts: 0,
+      downloads: 0,
+      views: 0,
+      ratingCount: 0,
+      weightedRating: 0,
+    };
+
+    const ratingAvg =
+      stats.ratingCount > 0 ? stats.weightedRating / stats.ratingCount : 0;
+
+    return {
+      id: seller.sellerId,
+      slug: seller.slug,
+      displayName: seller.displayName,
+      avatarUrl: seller.avatarStorageKey
+        ? this.mediaUrl(seller.avatarStorageKey)
+        : null,
+      headline: seller.headline ?? null,
+      verified: seller.verified === true,
+      joinedAt: (seller as any).createdAt
+        ? new Date((seller as any).createdAt).toISOString()
+        : new Date().toISOString(),
+      statistics: {
+        publishedScripts: stats.publishedScripts,
+        downloads: stats.downloads,
+        views: stats.views,
+        ratingAvg,
+        ratingCount: stats.ratingCount,
+      },
+    };
+  }
 
   async browsePublic(dto: BrowsePublicScriptsDto) {
     const tagIds = this.parseTagIds(dto.tagIds);

@@ -34,11 +34,16 @@ export function DeveloperDetailContent({
         <div className="developer-profile__header grid grid-cols-1 sm:grid-cols-[128px_minmax(0,1fr)] gap-6 items-start mb-6">
           <Image
             className="developer-profile__avatar w-[128px] h-[128px] object-cover border border-[var(--line)]"
-            src={developer.avatar}
+            src={developer.avatar || '/images/icon.png'}
             alt={`${developer.name} seller profile`}
             width={128}
             height={128}
             priority
+            unoptimized={/^https?:\/\//i.test(developer.avatar || '')}
+            onError={(e) => {
+              e.currentTarget.srcset = '';
+              e.currentTarget.src = '/images/icon.png';
+            }}
           />
           <div>
             <p className="label font-mono text-[10px] uppercase tracking-widest text-[var(--steel)] font-semibold mb-2">{t('seller.featuredBadge')}</p>

@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Mail, Phone, Send, Star } from 'lucide-react';
+import { Mail, Phone, Send, Star, ArrowRight } from 'lucide-react';
 import type { Developer } from './model';
 import { useI18n } from '@/i18n';
 
@@ -11,7 +11,7 @@ export function DeveloperCard({ developer }: { developer: Developer }) {
   const isVi = locale === 'vi';
 
   return (
-    <article className="grid grid-cols-1 sm:grid-cols-[100px_minmax(0,1fr)_auto] gap-4 sm:gap-6 p-4 sm:p-5 bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--steel)] transition-colors items-start">
+    <article className="grid grid-cols-1 sm:grid-cols-[100px_minmax(0,1fr)_auto] gap-4 sm:gap-6 p-4 sm:p-5 bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--steel)] transition-colors items-center">
       <Image
         src={developer.avatar}
         alt={`${developer.name} seller profile`}
@@ -60,15 +60,29 @@ export function DeveloperCard({ developer }: { developer: Developer }) {
           </span>
         </p>
       </div>
-      <a
-        className="primary developer-contact-button inline-flex w-[calc(100%+1.5rem)] -mx-3 h-10 items-center justify-center p-0 bg-[var(--steel)] text-[var(--bg)] font-heading font-semibold text-sm hover:opacity-90 transition-opacity whitespace-nowrap self-center sm:w-auto sm:h-auto sm:mx-0 sm:gap-2 sm:px-4 sm:py-2.5 sm:self-center mt-2 sm:mt-0"
-        href={`mailto:${developer.email}`}
-        aria-label={t('seller.contact')}
-        title={t('seller.contact')}
-      >
-        <Send size={15} aria-hidden="true" />
-        <span className="hidden sm:inline">{t('seller.contact')}</span>
-      </a>
+      <div className="developer-card-actions">
+        {/* Nút liên hệ ở trên */}
+        <a
+          className="seller-btn-contact"
+          href={`mailto:${developer.email}`}
+          aria-label={t('seller.contact')}
+          title={t('seller.contact')}
+        >
+          <Send size={14} aria-hidden="true" className="shrink-0" />
+          <span>{t('seller.contact')}</span>
+        </a>
+
+        {/* Nút xem thêm ở dưới */}
+        <Link
+          className="seller-btn-profile"
+          href={`/sellers/${developer.slug}`}
+          aria-label={t('seller.viewProfile')}
+          title={t('seller.viewProfile')}
+        >
+          <span>{t('seller.viewProfile')}</span>
+          <ArrowRight size={14} aria-hidden="true" className="shrink-0" />
+        </Link>
+      </div>
     </article>
   );
 }

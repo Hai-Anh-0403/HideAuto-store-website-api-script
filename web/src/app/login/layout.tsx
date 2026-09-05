@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import '@/styles/store/base.css'
 
 /**
  * The one page a stranger can actually reach, so it is the one that gets a real

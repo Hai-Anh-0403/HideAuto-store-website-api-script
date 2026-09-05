@@ -18,6 +18,7 @@ export const ScriptListItem = memo(function ScriptListItem({
 }) {
   const isPublic = 'statistics' in script
   const thumbnail = isPublic ? script.thumbnailUrl ?? '/images/icon.png' : script.image
+  const externalThumbnail = /^https?:\/\//i.test(thumbnail)
   const seller = isPublic ? script.seller.displayName : script.seller
   const version = isPublic ? script.latestApprovedVersion : script.version
   const rating = isPublic ? script.statistics.ratingAvg.toFixed(1) : String(script.watches)
@@ -39,6 +40,11 @@ export const ScriptListItem = memo(function ScriptListItem({
             width={120}
             height={120}
             priority={priority}
+            unoptimized={externalThumbnail}
+            onError={(event) => {
+              event.currentTarget.srcset = ''
+              event.currentTarget.src = '/images/icon.png'
+            }}
             loading={priority ? undefined : 'lazy'}
             sizes="(max-width: 760px) 100px, 120px"
             className="w-full h-full object-cover filter saturate-75 contrast-105 group-hover:scale-105 transition-transform duration-300"

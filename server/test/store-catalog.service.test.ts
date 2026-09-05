@@ -59,6 +59,7 @@ async function run() {
     scriptModel as never,
     tagModel as never,
     {} as never,
+    {} as never,
   );
   const dto = Object.assign(new BrowsePublicScriptsDto(), {
     q: 'browser',

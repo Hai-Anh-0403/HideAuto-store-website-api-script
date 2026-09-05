@@ -43,7 +43,7 @@ export const developers: Developer[] = [
     headline: 'Practical data extraction tools',
     headlineVi: 'Công cụ trích xuất dữ liệu thực tiễn',
     bio: 'Independent sellers focused on useful document and marketplace data.',
-    bioVi: 'Nhóm người bán tập trung vào dữ liệu tài liệu và sàn thương mại.',
+    bioVi: 'Nhóm Seller tập trung vào dữ liệu tài liệu và sàn thương mại.',
     specialties: ['Data extraction', 'Python'],
     avatar:
       'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
@@ -121,7 +121,7 @@ export const developers: Developer[] = [
     headlineVi: 'Dữ liệu sạch từ các trang phức tạp',
     bio: 'Data-focused seller building concise extraction workflows.',
     bioVi:
-      'Người bán tập trung dữ liệu xây dựng quy trình trích xuất gọn gàng.',
+      'Seller tập trung dữ liệu xây dựng quy trình trích xuất gọn gàng.',
     specialties: ['Data extraction', 'Web'],
     avatar:
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',

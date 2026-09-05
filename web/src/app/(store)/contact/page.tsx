@@ -15,6 +15,7 @@ import type { PublicScriptDetail } from '@/types';
 function ContactContent() {
   const searchParams = useSearchParams();
   const scriptSlug = searchParams.get('script');
+  const sellerName = searchParams.get('seller');
   const { t } = useI18n();
 
   const scriptResult = useFetch(
@@ -35,6 +36,11 @@ function ContactContent() {
     ? {
         name: scriptSlug,
         seller: 'HideAuto Seller',
+      }
+    : sellerName
+    ? {
+        name: t('contact.directInquiry'),
+        seller: sellerName,
       }
     : null;
 
@@ -69,4 +75,3 @@ export default function ContactPage() {
     </Suspense>
   );
 }
-

@@ -10,12 +10,13 @@
     "start:mongo-api": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/main.mongo.ts",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\"",
-    "test": "pnpm test:graph && pnpm test:license && pnpm test:keys && pnpm test:container && pnpm test:mongo && pnpm test:store-dto && pnpm test:store-catalog && pnpm test:store-detail",
+    "test": "pnpm test:graph && pnpm test:license && pnpm test:keys && pnpm test:container && pnpm test:mongo && pnpm test:marketplace-sellers && pnpm test:store-dto && pnpm test:store-catalog && pnpm test:store-detail",
     "test:graph": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/workflow-graph.test.ts",
     "test:license": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/license.test.ts",
     "test:keys": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/key-code.test.ts",
     "test:container": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/mini-app-container.test.ts",
     "test:mongo": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/mongo-foundation.test.ts",
+    "test:marketplace-sellers": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/marketplace-seller.schema.test.ts && ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/marketplace-seller-projector.test.ts",
     "test:store-dto": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/store-public-dto.test.ts",
     "test:store-catalog": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/store-catalog.service.test.ts",
     "test:store-detail": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} test/store-detail.service.test.ts",
@@ -25,6 +26,8 @@
     "db:seed": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed.ts",
     "db:seed:demo": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-demo.ts",
     "db:seed:mongo-frontend": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-mongo-frontend.ts",
+    "db:seed:mongo-sellers": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-mongo-marketplace-sellers.ts",
+    "db:verify:mongo-sellers": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/verify-mongo-marketplace-sellers.ts",
     "db:seed:demo:clear": "ts-node --compiler-options {\\\"module\\\":\\\"commonjs\\\"} src/seed-demo.ts --clear"
   },
   "dependencies": {

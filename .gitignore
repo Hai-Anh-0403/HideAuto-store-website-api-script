@@ -2,6 +2,7 @@
 node_modules/
 dist/
 .next/
+.next.old/
 *.tsbuildinfo
 .vite/
 *.local
@@ -10,6 +11,11 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Local documentation (never pushed to git)
+METHODS_DICTIONARY.md
+*.local.md
+
 
 # Prisma / runtime artifacts
 server/var/

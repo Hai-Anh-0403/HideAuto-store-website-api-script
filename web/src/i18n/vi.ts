@@ -23,7 +23,7 @@ export const vi = {
   'sidebar.month': 'Tháng này',
   'sidebar.monthSub': 'so với tháng trước',
 
-  'topbar.crumb': 'Người bán',
+  'topbar.crumb': 'Seller',
   'topbar.themeToggle': 'Đổi giao diện',
   'topbar.logout': 'Đăng xuất',
   'topbar.theme': 'Đổi giao diện sáng / tối / theo hệ thống',
@@ -57,7 +57,7 @@ export const vi = {
   'time.now': 'vừa xong',
 
   // Nhóm node đọc ra từ workflow. Trước đây hiện thẳng mã tiếng Anh (browser, keyboard…)
-  // vì không đi qua t(); người bán không phải lập trình viên nên phải dịch.
+  // vì không đi qua t(); Seller không phải lập trình viên nên phải dịch.
   'group.browser': 'Trình duyệt',
   'group.tab': 'Tab',
   'group.element': 'Phần tử trang',
@@ -528,9 +528,9 @@ export const vi = {
   'errors.version_last_remaining': 'Mini app phải giữ ít nhất 1 phiên bản.',
   'errors.version_has_builds': 'Bản này đã có gói cài đặt — xoá gói trước đã.',
   'errors.version_already_live': 'Bản này đang là bản bán rồi.',
-  'errors.device_blocked': 'Người bán đã chặn thiết bị này.',
-  'errors.member_blocked': 'Người bán đã chặn quyền truy cập của bạn.',
-  'errors.seller_unavailable': 'Người bán này hiện không khả dụng.',
+  'errors.device_blocked': 'Seller đã chặn thiết bị này.',
+  'errors.member_blocked': 'Seller đã chặn quyền truy cập của bạn.',
+  'errors.seller_unavailable': 'Seller này hiện không khả dụng.',
   'errors.script_not_found': 'Không tìm thấy mini app.',
   'errors.script_not_published': 'Mini app này không còn trên store.',
   'errors.no_approved_version': 'Mini app này chưa có bản nào được duyệt để tải.',
@@ -572,7 +572,7 @@ export const vi = {
   'admin.review.approve': 'Duyệt và cho bán',
   'admin.review.approveConfirm': 'Cho bán {name}? Từ giờ người mua tải bản này.',
   'admin.review.reject': 'Từ chối',
-  'admin.review.reasonPrompt': 'Vì sao từ chối {name}? Người bán sẽ đọc được dòng này.',
+  'admin.review.reasonPrompt': 'Vì sao từ chối {name}? Seller sẽ đọc được dòng này.',
   'admin.review.approved': 'Đã cho bán {name}',
   'admin.review.rejected': 'Đã từ chối {name}',
   'admin.review.blocked': 'Bị chặn: workflow vẫn còn thông tin bí mật.',

@@ -6,10 +6,12 @@ import { StoreService } from './store.service';
 import { Script, ScriptSchema } from '../scripts/schemas/script.schema';
 import { ScriptVersion, ScriptVersionSchema } from '../scripts/schemas/script-version.schema';
 import { Tag, TagSchema } from '../tags/schemas/tag.schema';
+import { MarketplaceSellersModule } from '../sellers/marketplace-sellers.module';
 
 @Module({
   imports: [
     PrismaModule,
+    MarketplaceSellersModule,
     MongooseModule.forFeature([
       { name: Script.name, schema: ScriptSchema },
       { name: ScriptVersion.name, schema: ScriptVersionSchema },

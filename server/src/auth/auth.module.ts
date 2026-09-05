@@ -5,12 +5,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { MarketplaceSellersModule } from '../sellers/marketplace-sellers.module';
 
 /** `ms`-style duration accepted by jsonwebtoken (e.g. '7d'), narrower than plain string. */
 type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions['signOptions']>['expiresIn']>;
 
 @Module({
   imports: [
+    MarketplaceSellersModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

@@ -281,3 +281,17 @@ h1 em {
 ::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--ink) 40%, transparent);
 }
+
+/* Theme icon toggle (2-mode: light/dark) */
+.theme-icon-sun {
+  display: none;
+}
+.theme-icon-moon {
+  display: block;
+}
+[data-theme='dark'] .theme-icon-sun {
+  display: block;
+}
+[data-theme='dark'] .theme-icon-moon {
+  display: none;
+}

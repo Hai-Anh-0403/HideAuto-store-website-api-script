@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   ConflictError,
   ForbiddenError,
@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { MarketplaceSellerProjectorService } from '../sellers/marketplace-seller-projector.service';
 
 /** What the portal shows in the "devices" table, derived from the browser's own claim. */
 export interface SessionContext {
@@ -20,10 +21,13 @@ export interface SessionContext {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly marketplaceSellerProjector: MarketplaceSellerProjectorService,
   ) {}
 
   async loginSeller(dto: LoginDto, context: SessionContext = {}) {
@@ -74,6 +78,8 @@ export class AuthService {
         status: 'PENDING',
       },
     });
+
+    await this.projectSellerOrLog(seller);
 
     return this.issueSellerSession(seller.id, context);
   }
@@ -175,6 +181,25 @@ export class AuthService {
         return value * 24 * 60 * 60 * 1000;
       default:
         return 7 * 24 * 60 * 60 * 1000;
+    }
+  }
+
+  private async projectSellerOrLog(seller: {
+    id: string;
+    name: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+    createdAt: Date;
+    updatedAt: Date;
+  }): Promise<void> {
+    try {
+      await this.marketplaceSellerProjector.project(seller);
+    } catch (error) {
+      // MongoDB is a recoverable storefront read model. Do not leave the primary
+      // MySQL registration half-completed when its projection is temporarily down.
+      this.logger.error(
+        `Could not project seller ${seller.id} to MongoDB`,
+        error instanceof Error ? error.stack : undefined,
+      );
     }
   }
 }
